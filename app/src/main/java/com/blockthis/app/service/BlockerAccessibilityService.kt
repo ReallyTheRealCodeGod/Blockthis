@@ -1,6 +1,7 @@
 package com.blockthis.app.service
 
 import android.accessibilityservice.AccessibilityService
+import android.app.KeyguardManager
 import android.graphics.PixelFormat
 import android.os.Handler
 import android.os.Looper
@@ -102,7 +103,10 @@ class BlockerAccessibilityService : AccessibilityService() {
             lastPrune = now
         }
         val pm = getSystemService(POWER_SERVICE) as PowerManager
-        if (pm.isInteractive && overlayView == null && foregroundPackage.isNotEmpty()) {
+        val km = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
+        if (pm.isInteractive && !km.isKeyguardLocked &&
+            overlayView == null && foregroundPackage.isNotEmpty()
+        ) {
             for (p in Store.profiles(this)) {
                 if (p.mode == BlockMode.LIMIT && p.enabled && foregroundPackage in p.packages) {
                     UsageStore.addSeconds(this, p.id, TICK_MS / 1000L)

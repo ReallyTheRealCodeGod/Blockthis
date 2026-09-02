@@ -26,6 +26,11 @@ Built with Kotlin and zero external dependencies (platform APIs only).
   - the uninstall path is closed: package installers, the Play Store and the
     sensitive Settings screens (device admin, accessibility, app info / app
     lists) are blocked by the same overlay that blocks apps;
+  - the cheat paths are closed too: date & time settings (so schedule blocks
+    can't be ended by changing the clock), developer options (so USB
+    debugging can't be enabled mid-block) and reset/factory-reset screens
+    are also blocked, and focus sessions run on the monotonic clock, so
+    changing the wall clock doesn't shorten them;
   - with device admin enabled, Android itself refuses to uninstall the app.
 - **Paranoid option** — additionally block the *entire* system Settings app
   while any strict block runs.
@@ -71,9 +76,11 @@ No non-system app can make itself literally impossible to remove — that would
 require device-owner provisioning. What Blockthis does is what the established
 strict blockers do: close every normal path while a block runs. Determined
 circumvention is still possible via **safe mode** (system boots without
-third-party apps), **ADB** from a computer, or OEM settings apps whose screen
-titles the heuristics don't recognize (the *paranoid* option covers most of
-those by blocking Settings wholesale). A factory reset always works. If you
+third-party apps), **ADB** from a computer (only if USB debugging was already
+enabled — turning it on mid-block is itself blocked), or OEM settings apps
+whose screen titles the heuristics don't recognize (the *paranoid* option
+covers most of those by blocking Settings wholesale). Recovery-mode factory
+reset always works. If you
 need it harder than that, the honest answer is device-owner/MDM provisioning,
 which is a different setup for a dedicated device.
 

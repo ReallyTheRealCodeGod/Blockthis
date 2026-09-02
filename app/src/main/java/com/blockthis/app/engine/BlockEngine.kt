@@ -67,8 +67,19 @@ object BlockEngine {
         "app info", "appinfo", "installedappdetails",
         "manage apps", "manageapplications", "all apps", "app management",
         "special app access", "specialaccess",
-        "uninstall"
+        "uninstall",
+        // Clock cheating would end schedule blocks early.
+        "date & time", "date and time", "datetime", "set time", "set date",
+        // Developer options would open the ADB escape hatch mid-block.
+        "developer options", "developeroptions", "developmentsettings",
+        "usb debugging",
+        // Wiping the device removes the blocker.
+        "reset", "factory", "erase all", "masterclear"
     )
+
+    /** Injectable for JVM tests; on a device this is SystemClock.elapsedRealtime. */
+    @Volatile
+    var elapsedRealtimeProvider: () -> Long = { android.os.SystemClock.elapsedRealtime() }
 
     @Volatile
     private var cachedLaunchers: Set<String> = emptySet()
@@ -116,9 +127,35 @@ object BlockEngine {
     ): Boolean = when (p.mode) {
         BlockMode.ALWAYS -> p.enabled
         BlockMode.SCHEDULE -> p.enabled && p.schedules.any { ruleEndMillis(it, now) != null }
-        BlockMode.TIMER -> now < p.timerEndMillis
+        BlockMode.TIMER -> timerActive(p, now)
         BlockMode.LIMIT -> p.enabled && p.limitMinutes > 0 &&
             UsageStore.usedSeconds(context, p.id) >= p.limitMinutes * 60L
+    }
+
+    /**
+     * A running session is governed by the monotonic clock, so setting the
+     * wall clock forward does not end it early. After a reboot (monotonic
+     * clock restarted) the wall-clock deadline takes over.
+     */
+    private fun timerActive(p: BlockProfile, now: Long): Boolean {
+        if (p.timerEndMillis <= 0L) return false
+        if (p.timerEndElapsed > 0L) {
+            val elapsed = elapsedRealtimeProvider()
+            if (elapsed >= p.timerElapsedAtStart) {
+                return elapsed < p.timerEndElapsed
+            }
+        }
+        return now < p.timerEndMillis
+    }
+
+    private fun timerUntilMillis(p: BlockProfile, now: Long): Long {
+        if (p.timerEndElapsed > 0L) {
+            val elapsed = elapsedRealtimeProvider()
+            if (elapsed >= p.timerElapsedAtStart && elapsed < p.timerEndElapsed) {
+                return now + (p.timerEndElapsed - elapsed)
+            }
+        }
+        return p.timerEndMillis
     }
 
     /**
@@ -143,9 +180,35 @@ object BlockEngine {
     /** Long.MAX_VALUE means "until you switch it off" / no scheduled end. */
     fun blockedUntilMillis(context: Context, p: BlockProfile, now: Long): Long = when (p.mode) {
         BlockMode.ALWAYS -> Long.MAX_VALUE
-        BlockMode.TIMER -> p.timerEndMillis
+        BlockMode.TIMER -> timerUntilMillis(p, now)
         BlockMode.LIMIT -> nextMidnight(now)
         BlockMode.SCHEDULE -> scheduleEnd(p.schedules, now)
+    }
+
+    /** Next moment an enabled SCHEDULE profile starts blocking, or null. */
+    fun nextScheduleStartMillis(p: BlockProfile, now: Long): Long? {
+        if (p.mode != BlockMode.SCHEDULE || !p.enabled || p.schedules.isEmpty()) return null
+        var best: Long? = null
+        val cal = Calendar.getInstance()
+        cal.timeInMillis = now
+        for (rule in p.schedules) {
+            if (rule.days.isEmpty()) continue
+            for (offset in 0..7) {
+                val c = cal.clone() as Calendar
+                c.add(Calendar.DAY_OF_YEAR, offset)
+                if (isoDay(c) !in rule.days) continue
+                c.set(Calendar.HOUR_OF_DAY, rule.startMinute / 60)
+                c.set(Calendar.MINUTE, rule.startMinute % 60)
+                c.set(Calendar.SECOND, 0)
+                c.set(Calendar.MILLISECOND, 0)
+                val t = c.timeInMillis
+                if (t > now) {
+                    if (best == null || t < best) best = t
+                    break
+                }
+            }
+        }
+        return best
     }
 
     private fun nextMidnight(now: Long): Long {
@@ -213,17 +276,21 @@ object BlockEngine {
         }
     }
 
+    /** "HH:mm" for the near future, "EEE HH:mm" further out. */
+    fun formatWallTime(millis: Long): String {
+        val now = System.currentTimeMillis()
+        return if (millis - now < 20 * 60 * 60 * 1000L) {
+            SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(millis))
+        } else {
+            SimpleDateFormat("EEE HH:mm", Locale.getDefault()).format(Date(millis))
+        }
+    }
+
     fun untilText(context: Context, untilMillis: Long): String {
         if (untilMillis == Long.MAX_VALUE) {
             return context.getString(R.string.until_indefinite)
         }
-        val now = System.currentTimeMillis()
-        val text = if (untilMillis - now < 20 * 60 * 60 * 1000L) {
-            SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(untilMillis))
-        } else {
-            SimpleDateFormat("EEE HH:mm", Locale.getDefault()).format(Date(untilMillis))
-        }
-        return context.getString(R.string.until_time, text)
+        return context.getString(R.string.until_time, formatWallTime(untilMillis))
     }
 
     // ------------------------------------------------------------------

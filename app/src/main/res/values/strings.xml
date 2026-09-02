@@ -35,6 +35,11 @@
     <string name="timer_locked">Locked until it ends</string>
     <string name="timer_dialog_title">Session length (minutes)</string>
     <string name="dialog_start">Start</string>
+    <string name="starts_at">Starts %1$s</string>
+    <string name="confirm_strict_timer_title">Start strict session?</string>
+    <string name="confirm_strict_timer_message">For the next %1$d minutes this list locks itself: the session cannot be stopped early, and Blockthis cannot be disabled or uninstalled.</string>
+    <string name="confirm_strict_now_title">Strict block starts now</string>
+    <string name="confirm_strict_now_message">Saving locks this list %1$s. Until then it cannot be edited, switched off or deleted, and Blockthis cannot be disabled or uninstalled. Continue?</string>
     <string name="toast_enable_service_first">Turn on the blocking service (accessibility) or nothing will actually be blocked.</string>
     <string name="toast_locked">Strict block running — locked %1$s.</string>
     <string name="toast_locked_simple">Strict block running — this block list is locked until it ends.</string>

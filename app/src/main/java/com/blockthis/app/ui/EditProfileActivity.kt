@@ -299,7 +299,31 @@ class EditProfileActivity : Activity() {
             BlockMode.ALWAYS -> Unit
         }
         if (profile.mode == BlockMode.ALWAYS) profile.strict = false
-        if (profile.mode != BlockMode.TIMER) profile.timerEndMillis = 0L
+        if (profile.mode != BlockMode.TIMER) {
+            profile.timerEndMillis = 0L
+            profile.timerEndElapsed = 0L
+            profile.timerElapsedAtStart = 0L
+        }
+
+        // Warn when saving locks the list immediately (strict + blocking now),
+        // so nobody strands themselves by accident.
+        val locksNow = profile.strict && profile.mode != BlockMode.ALWAYS &&
+            BlockEngine.isBlockingNow(this, profile)
+        if (locksNow) {
+            val until = BlockEngine.blockedUntilMillis(this, profile, System.currentTimeMillis())
+            AlertDialog.Builder(this)
+                .setTitle(R.string.confirm_strict_now_title)
+                .setMessage(
+                    getString(R.string.confirm_strict_now_message, BlockEngine.untilText(this, until))
+                )
+                .setPositiveButton(R.string.button_save) { _, _ ->
+                    Store.upsert(this, profile)
+                    finish()
+                }
+                .setNegativeButton(R.string.cancel, null)
+                .show()
+            return
+        }
 
         Store.upsert(this, profile)
         finish()

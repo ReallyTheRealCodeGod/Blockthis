@@ -65,6 +65,12 @@ class BlockProfile(
     var timerMinutes: Int = 30,
     /** End of the currently running TIMER session (epoch millis), 0 = none. */
     var timerEndMillis: Long = 0L,
+    /** Session end on the monotonic elapsedRealtime clock, so changing the
+     *  wall clock cannot end a session early. 0 = none. */
+    var timerEndElapsed: Long = 0L,
+    /** elapsedRealtime() when the session started; used to detect reboots
+     *  (after a reboot the monotonic clock restarts and wall time governs). */
+    var timerElapsedAtStart: Long = 0L,
     /** While a strict profile is actively blocking, the app protects itself:
      *  uninstall/settings screens are blocked and the profile is locked. */
     var strict: Boolean = false,
@@ -81,6 +87,8 @@ class BlockProfile(
         put("limitMinutes", limitMinutes)
         put("timerMinutes", timerMinutes)
         put("timerEndMillis", timerEndMillis)
+        put("timerEndElapsed", timerEndElapsed)
+        put("timerElapsedAtStart", timerElapsedAtStart)
         put("strict", strict)
         put("enabled", enabled)
     }
@@ -113,6 +121,8 @@ class BlockProfile(
                 limitMinutes = o.optInt("limitMinutes", 60).coerceAtLeast(1),
                 timerMinutes = o.optInt("timerMinutes", 30).coerceAtLeast(1),
                 timerEndMillis = o.optLong("timerEndMillis", 0L),
+                timerEndElapsed = o.optLong("timerEndElapsed", 0L),
+                timerElapsedAtStart = o.optLong("timerElapsedAtStart", 0L),
                 strict = o.optBoolean("strict", false),
                 enabled = o.optBoolean("enabled", true)
             )

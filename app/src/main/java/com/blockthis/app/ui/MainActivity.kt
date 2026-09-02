@@ -8,6 +8,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.provider.Settings
 import android.text.InputType
 import android.view.View
@@ -190,6 +191,8 @@ class MainActivity : Activity() {
                 toastLocked(real)
             } else {
                 real.timerEndMillis = 0L
+                real.timerEndElapsed = 0L
+                real.timerElapsedAtStart = 0L
                 Store.persist(this)
                 refresh()
             }
@@ -203,20 +206,35 @@ class MainActivity : Activity() {
             .setView(input)
             .setPositiveButton(R.string.dialog_start) { _, _ ->
                 val minutes = input.text.toString().toIntOrNull() ?: 0
-                if (minutes > 0) {
-                    real.timerMinutes = minutes
-                    real.timerEndMillis = System.currentTimeMillis() + minutes * 60_000L
-                    Store.persist(this)
-                    if (!isAccessibilityEnabled()) {
-                        Toast.makeText(
-                            this, R.string.toast_enable_service_first, Toast.LENGTH_LONG
-                        ).show()
-                    }
-                    refresh()
+                if (minutes <= 0) return@setPositiveButton
+                if (real.strict) {
+                    AlertDialog.Builder(this)
+                        .setTitle(R.string.confirm_strict_timer_title)
+                        .setMessage(getString(R.string.confirm_strict_timer_message, minutes))
+                        .setPositiveButton(R.string.dialog_start) { _, _ ->
+                            startTimerSession(real, minutes)
+                        }
+                        .setNegativeButton(R.string.cancel, null)
+                        .show()
+                } else {
+                    startTimerSession(real, minutes)
                 }
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
+    }
+
+    private fun startTimerSession(profile: BlockProfile, minutes: Int) {
+        val elapsed = SystemClock.elapsedRealtime()
+        profile.timerMinutes = minutes
+        profile.timerEndMillis = System.currentTimeMillis() + minutes * 60_000L
+        profile.timerElapsedAtStart = elapsed
+        profile.timerEndElapsed = elapsed + minutes * 60_000L
+        Store.persist(this)
+        if (!isAccessibilityEnabled()) {
+            Toast.makeText(this, R.string.toast_enable_service_first, Toast.LENGTH_LONG).show()
+        }
+        refresh()
     }
 
     // ------------------------------------------------------------------
@@ -302,6 +320,12 @@ class MainActivity : Activity() {
             if (profile.mode == BlockMode.LIMIT && profile.enabled) {
                 val used = (UsageStore.usedSeconds(this@MainActivity, profile.id) / 60L).toInt()
                 return getString(R.string.limit_status, used, profile.limitMinutes)
+            }
+            if (profile.mode == BlockMode.SCHEDULE && profile.enabled) {
+                val next = BlockEngine.nextScheduleStartMillis(profile, now)
+                if (next != null) {
+                    return getString(R.string.starts_at, BlockEngine.formatWallTime(next))
+                }
             }
             return ""
         }
