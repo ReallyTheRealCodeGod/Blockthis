@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- No policies are used. An active (empty) admin is enough to prevent
+         uninstalling the app until the admin is deactivated, and Blockthis
+         blocks the deactivation screens while a strict block is running. -->
+    <uses-policies />
+</device-admin>
