@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Blockthis</string>
+    <string name="main_subtitle">Block distracting apps with schedules, focus sessions and daily limits.</string>
+
+    <!-- Setup card -->
+    <string name="setup_header">Setup</string>
+    <string name="setup_accessibility_title">Blocking service (accessibility)</string>
+    <string name="setup_admin_title">Uninstall protection (device admin)</string>
+    <string name="status_enabled">Enabled</string>
+    <string name="status_tap_to_enable">Off — tap to enable</string>
+    <string name="admin_active">Active</string>
+    <string name="admin_active_dialog">Uninstall protection is active. Android will refuse to uninstall Blockthis until the device admin is deactivated in system settings — and while a strict block is running, those settings are blocked too.</string>
+    <string name="admin_add_explanation">Blockthis uses device admin only to prevent the app from being uninstalled while a block is active. It uses no other admin capabilities and cannot see your screen, password or data.</string>
+    <string name="toast_no_settings">Could not open system settings on this device.</string>
+
+    <!-- Paranoid mode -->
+    <string name="paranoid_title">Also block all of Settings</string>
+    <string name="paranoid_subtitle">While a strict block runs, the entire system Settings app is blocked, not just the screens that could disable Blockthis.</string>
+
+    <!-- Profile list -->
+    <string name="profiles_header">Block lists</string>
+    <string name="empty_profiles">No block lists yet.\nTap “New block list” to create one.</string>
+    <string name="new_profile">New block list</string>
+    <string name="mode_always">Always on</string>
+    <string name="mode_schedule">Schedule</string>
+    <string name="mode_timer">Focus sessions</string>
+    <string name="mode_limit">Daily limit %1$d min</string>
+    <string name="summary_apps">%1$d apps</string>
+    <string name="strict_marker">Strict</string>
+    <string name="blocking_now">Blocking now • %1$s</string>
+    <string name="limit_status">Used %1$d of %2$d min today</string>
+    <string name="timer_start">Start session</string>
+    <string name="timer_stop">Stop session</string>
+    <string name="timer_locked">Locked until it ends</string>
+    <string name="timer_dialog_title">Session length (minutes)</string>
+    <string name="dialog_start">Start</string>
+    <string name="toast_enable_service_first">Turn on the blocking service (accessibility) or nothing will actually be blocked.</string>
+    <string name="toast_locked">Strict block running — locked %1$s.</string>
+    <string name="toast_locked_simple">Strict block running — this block list is locked until it ends.</string>
+
+    <!-- Until formatting -->
+    <string name="until_time">until %1$s</string>
+    <string name="until_indefinite">until you switch it off</string>
+
+    <!-- Editor -->
+    <string name="title_new_profile">New block list</string>
+    <string name="title_edit_profile">Edit block list</string>
+    <string name="hint_name">Name (e.g. Social media)</string>
+    <string name="default_profile_name">Block list</string>
+    <string name="label_mode">Blocking mode</string>
+    <string name="mode_always_label">Always — blocked whenever the list is switched on</string>
+    <string name="mode_schedule_label">Schedule — blocked during weekly time windows</string>
+    <string name="mode_timer_label">Focus sessions — start a timed block manually</string>
+    <string name="mode_limit_label">Daily limit — blocked after a daily time allowance</string>
+    <string name="label_windows">Time windows</string>
+    <string name="button_add_window">Add time window</string>
+    <string name="label_limit">Daily allowance (minutes)</string>
+    <string name="label_timer">Default session length (minutes)</string>
+    <string name="strict_title">Strict mode</string>
+    <string name="strict_subtitle">While this list is blocking, it locks itself: it cannot be edited, switched off or deleted, and Blockthis cannot be disabled or uninstalled.</string>
+    <string name="strict_always_hint">Strict mode is not available for Always lists, so a mistake can always be undone. For a permanent strict block, use a schedule that covers every day 24 hours.</string>
+    <string name="button_select_apps">Select apps (%1$d)</string>
+    <string name="button_save">Save</string>
+    <string name="button_delete">Delete block list</string>
+    <string name="toast_no_apps">Select at least one app to block.</string>
+    <string name="toast_no_windows">Add at least one time window.</string>
+    <string name="toast_bad_limit">Enter a daily allowance of at least 1 minute.</string>
+    <string name="toast_bad_timer">Enter a session length of at least 1 minute.</string>
+    <string name="confirm_delete_title">Delete this block list?</string>
+    <string name="confirm_delete_message">Its apps will no longer be blocked.</string>
+    <string name="delete">Delete</string>
+    <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
+
+    <!-- Schedule dialog -->
+    <string name="dialog_window_title">Time window</string>
+    <string name="label_days">Days</string>
+    <string name="label_start">Start</string>
+    <string name="label_end">End</string>
+    <string name="wrap_note">If the end is at or before the start, the window runs into the next day. Equal start and end means 24 hours.</string>
+    <string name="toast_pick_day">Pick at least one day.</string>
+    <string name="next_day_marker">(next day)</string>
+    <string name="every_day">Every day</string>
+
+    <!-- App picker -->
+    <string name="picker_title">Choose apps to block</string>
+    <string name="hint_search">Search apps</string>
+    <string name="picker_loading">Loading apps…</string>
+    <string name="done_count">Done (%1$d selected)</string>
+
+    <!-- Overlay -->
+    <string name="overlay_blocked_title">%1$s is blocked</string>
+    <string name="overlay_blocked_subtitle">Blocked by “%1$s”</string>
+    <string name="overlay_protected_title">This screen is locked</string>
+    <string name="overlay_protected_subtitle">A strict block is running, so settings that could disable Blockthis are unavailable.</string>
+    <string name="overlay_leave">OK</string>
+
+    <!-- Device admin -->
+    <string name="device_admin_disable_warning">Deactivating this will let Blockthis be uninstalled. If a strict block is running, this screen should not even be reachable.</string>
+
+    <!-- Accessibility service -->
+    <string name="accessibility_service_label">Blockthis app blocker</string>
+    <string name="accessibility_service_description">Blockthis uses this accessibility service to detect which app is in the foreground and to show a blocking screen over apps you chose to block, according to your schedules, focus sessions and daily limits. It also keeps its own settings screens unreachable while a strict block is running. Blockthis does not collect, store or share any personal data, screen content or typed text.</string>
+</resources>
