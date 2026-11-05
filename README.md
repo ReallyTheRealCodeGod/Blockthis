@@ -3,7 +3,8 @@
 Real, fully legal chess (castling, en passant, promotion, checkmate/stalemate, threefold repetition, 50-move rule) wrapped in a TikTok-brained
 attention-span-destroyer. No build step — open `index.html` in a browser.
 
-You play cyan (white) against a bot. Tap a piece, tap a green dot.
+You play cyan (white) against a bot. Tap a piece then a green dot, or drag it (keyboard works too: Enter on a square).
+Promotions open a picker; underpromoting earns bonus aura.
 
 ## The brainrot
 - **Aura** score + rank (NPC → NORMIE → MID → SIGMA → GIGACHAD → ULTRA INSTINCT)
@@ -21,6 +22,6 @@ You play cyan (white) against a bot. Tap a piece, tap a green dot.
 `prefers-reduced-motion` turns off shake/spin/hue effects.
 
 ## Files
-- `engine.js` — rules + AI (no UI).
+- `engine.js` — rules + AI (no UI). The page runs it in a Web Worker built from `ChessEngine.source`, falling back to the main thread if workers are unavailable.
 - `tests/engine.test.js` — `node tests/engine.test.js`: perft counts, draw rules, and the bot converting K+Q / K+R endgames.
 - `index.html` — UI, effects, audio.

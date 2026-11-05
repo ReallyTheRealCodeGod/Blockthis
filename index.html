@@ -134,6 +134,21 @@
   #evaltxt { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 900; color: #fff;
     text-shadow: 0 1px 2px #000, 0 0 4px #000; white-space: nowrap; overflow: hidden; letter-spacing: .3px; }
 
+  #board { touch-action: none; } /* dragging a piece must not scroll the page */
+  .sq.hov { box-shadow: inset 0 0 0 4px var(--yellow); }
+  .pc.dragging { opacity: .25; }
+  .pc.ghost { position: fixed; z-index: 60; pointer-events: none; transform: translate(-50%,-50%) scale(1.2); animation: none; }
+  #promo { position: absolute; inset: 0; z-index: 25; display: flex; align-items: center; justify-content: center; background: rgba(10,0,25,.72); border-radius: 10px; }
+  #promo[hidden] { display: none; }
+  #promobox { text-align: center; padding: 12px; }
+  #promobox p { margin: 0 0 10px; font-family: Impact, "Arial Black", system-ui, sans-serif; font-size: 22px; color: var(--yellow); text-transform: uppercase; }
+  #promoopts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .po { border: 2px solid var(--cyan); background: rgba(25,240,255,.15); color: #fff; border-radius: 12px; padding: 8px 4px 6px; cursor: pointer; font: inherit;
+    font-weight: 900; font-size: 10px; line-height: 1.1; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 58px; transition: transform .12s; }
+  .po i { font-style: normal; font-size: 30px; line-height: 1.1; }
+  .po:hover, .po:focus-visible { background: rgba(25,240,255,.35); transform: scale(1.06); outline: none; }
+  #promocancel { margin-top: 10px; background: none; border: 0; color: #fff; opacity: .85; font-weight: 800; text-decoration: underline; cursor: pointer; }
+
   /* unhinged additions */
   .pc { animation: wob 2.6s ease-in-out infinite; animation-delay: var(--d, 0s); }
   @keyframes wob { 0%,100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg) scale(1.04); } }
@@ -200,7 +215,9 @@
   </div>
 
   <div id="stage">
-    <div id="boardbox"><div id="board" role="grid" aria-label="Chess board"></div></div>
+    <div id="boardbox"><div id="board" role="grid" aria-label="Chess board"></div>
+      <div id="promo" hidden role="dialog" aria-label="Choose a promotion piece"><div id="promobox"><p>GLOW UP INTO…</p><div id="promoopts"></div><button type="button" id="promocancel">nvm</button></div></div>
+    </div>
     <div id="rail">
       <button class="rb" id="heartbtn" aria-label="Like"><b>❤️</b><span id="likes">0</span></button>
       <button class="rb" id="unobtn" aria-label="Uno reverse: undo your last turn (once per game)"><b>🔄</b><span>UNO</span></button>
@@ -265,6 +282,7 @@
     uno: ['UNO REVERSE 🔄', 'NO U', 'TIME LOOP ACTIVATED'],
     tax: ['FANUM TAX 🍟', 'THE TAX MAN COMETH', 'YOUR AURA WAS ASSESSED'],
     slow: ['TOO SLOW 💀', 'TIKTOK BRAIN TIMEOUT', 'ATTENTION SPAN: 0'],
+    under: ['UNDERPROMOTION?? 🤯', 'HORSE ARC 🐴', 'BIG BRAIN OR BIG BLUNDER?'],
   };
   const COLORS = ['#19f0ff', '#ff2bd6', '#b6ff1a', '#ffe600', '#ff8a1a', '#ffffff'];
   const USERS = ['skibidi_dad', 'xX_rizzler_Xx', 'gyatt_goblin', 'sigma_sam', 'ohio_final_boss', 'mewing_mike', 'npc_energy', 'babygronk', 'toilet_enjoyer', 'aura_farmer', 'lowtaperfade', 'chair_connoisseur', 'brainrot_andy', 'pawn_stan'];
@@ -333,11 +351,48 @@
   };
   const buzz = (ms) => { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} };
 
+  /* ---------- engine worker ---------- */
+  // The bot and the eval bar search in a Web Worker, so the thinking never freezes popups or
+  // animations. The worker is built from the engine's own source (no extra file to fetch).
+  // If workers are unavailable, or one errors or goes quiet, the same calls run here instead.
+  const WORKER_SRC = 'const E = (' + E.source + ')();\n' +
+    'self.onmessage = (e) => { const d = e.data;\n' +
+    '  try { self.postMessage({ id: d.id, result: E[d.fn].apply(null, d.args) }); }\n' +
+    '  catch (err) { self.postMessage({ id: d.id, error: String(err) }); } };';
+  let worker = null, wid = 0, pending = new Map();
+  const runLocal = (fn, args) => E[fn].apply(null, args);
+  function settle(p) { p.resolve(runLocal(p.fn, p.args)); }
+  function dropWorker() {
+    if (worker) worker.terminate();
+    worker = null; document.documentElement.dataset.engine = 'main';
+    const old = pending; pending = new Map(); old.forEach(settle);
+  }
+  try {
+    worker = new Worker(URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' })));
+    worker.onmessage = (e) => {
+      const p = pending.get(e.data.id); if (!p) return;
+      pending.delete(e.data.id);
+      if (e.data.error) settle(p); else p.resolve(e.data.result);
+    };
+    worker.onerror = (e) => { if (e.preventDefault) e.preventDefault(); dropWorker(); };
+    document.documentElement.dataset.engine = 'worker';
+  } catch (e) { worker = null; document.documentElement.dataset.engine = 'main'; }
+  // think('bestMove' | 'search', ...args) -> Promise of the engine function's result. Never rejects.
+  function think(fn, ...args) {
+    return new Promise((resolve) => {
+      const p = { resolve, fn, args };
+      if (!worker) { setTimeout(() => settle(p), 0); return; }
+      const id = ++wid; pending.set(id, p); worker.postMessage({ id, fn, args });
+      setTimeout(() => { if (pending.has(id)) dropWorker(); }, 5000); // watchdog
+    });
+  }
+
   /* ---------- state ---------- */
   let S, history, selected, legal, lastMove, over, thinking;
   let aura, combo, likes, unoLeft, plyCount, level = 1, adhd = false, skin = 'meme', skinOverride = null;
   let timerId = null, aiTimer = null, bestAura = 0, hand = [], freshCard = -1, rankIdx = 0, voiceOn = true, beatOn = false, sponsorT = null;
-  let endTimer = null, evalW = 0, bestForPlayer = null, sqKeys = [], handKey = '', nextPopAt = 0;
+  let endTimer = null, sqKeys = [], handKey = '', nextPopAt = 0;
+  let gen = 0, evalP = null, press = null, dragRect = null, promoOpen = false, ghost = null, hov = -1;
   try { bestAura = +localStorage.getItem('brainrot-chess-best') || 0; } catch (e) {}
   try { const sv = localStorage.getItem('brainrot-chess-skin'); if (SKINS[sv]) skin = sv; } catch (e) {}
 
@@ -468,7 +523,7 @@
         el.innerHTML = html;
       }
     }
-    $('unobtn').disabled = !(unoLeft && history.length >= 2 && S.turn === PLAYER && !over && !thinking);
+    $('unobtn').disabled = !(unoLeft && history.length >= 2 && S.turn === PLAYER && !over && !thinking && !promoOpen);
     renderHand();
   }
   function setStatus(t) { $('status').textContent = t; }
@@ -476,6 +531,7 @@
   /* ---------- game flow ---------- */
   function newGame() {
     clearTimeout(aiTimer); clearInterval(timerId); clearTimeout(endTimer);
+    gen++; closePromo(); cancelDrag();
     S = E.initial(); history = []; selected = -1; legal = E.legalMoves(S); lastMove = null; over = false; thinking = false;
     unoLeft = true; plyCount = 0; likes = 0; skinOverride = null; rankIdx = 0; hand = [rand(['flush', 'glow', 'brain'])]; freshCard = 0;
     clearInterval(sponsorT); $('sponsor').classList.remove('on'); $('npcsay').textContent = '';
@@ -483,26 +539,120 @@
     $('end').classList.remove('on');
     $('chat').innerHTML = '';
     chatSay('idle', 2);
-    render(); updateEval('play'); setStatus('YOUR TURN — you are the cyan team 🩵'); startTurnTimer();
+    render(); refreshEval(); setStatus('YOUR TURN — you are the cyan team 🩵'); startTurnTimer();
   }
 
-  function onSquare(i) {
-    if (over || thinking || S.turn !== PLAYER) return;
+  /* ---------- input: tap-tap, drag-and-drop, keyboard ---------- */
+  const canAct = () => !over && !thinking && S.turn === PLAYER && !promoOpen;
+  // Plays from->to if legal, opening the promotion picker when there's a choice to make.
+  function tryMoveTo(from, to) {
+    const ms = legal.filter((x) => x.f === from && x.t === to);
+    if (!ms.length) return false;
+    if (ms.length > 1) showPromo(ms); else play(ms[0], 'you');
+    return true;
+  }
+  function tapSquare(i) {
+    if (!canAct()) return;
     A(); // unlock audio on first gesture
+    if (selected >= 0 && selected !== i && tryMoveTo(selected, i)) return;
     const p = S.b[i];
-    if (selected >= 0) {
-      const m = legal.find((x) => x.f === selected && x.t === i && (!x.promo || x.promo === 'q'));
-      if (m) { play(m, 'you'); return; }
-    }
     if (p && E.colorOf(p) === PLAYER && i !== selected) { selected = i; sfx.tick(); } else selected = -1;
     render();
   }
+  function squareAt(x, y) {
+    const r = $('board').getBoundingClientRect();
+    if (x < r.left || y < r.top || x >= r.right || y >= r.bottom) return -1;
+    return Math.floor((y - r.top) / r.height * 8) * 8 + Math.floor((x - r.left) / r.width * 8);
+  }
+  function startDrag(pr) {
+    const pc = $('board').children[pr.i].querySelector('.pc'); if (!pc) return false;
+    const r = pc.getBoundingClientRect();
+    ghost = pc.cloneNode(true); ghost.classList.add('ghost');
+    ghost.style.width = r.width + 'px'; ghost.style.height = r.height + 'px';
+    document.body.appendChild(ghost); pc.classList.add('dragging'); pr.pc = pc;
+    return true;
+  }
+  function moveDrag(e) {
+    ghost.style.left = e.clientX + 'px'; ghost.style.top = e.clientY + 'px';
+    const t = squareAt(e.clientX, e.clientY), sqs = $('board').children;
+    const ok = t >= 0 && legal.some((m) => m.f === selected && m.t === t);
+    if (hov >= 0 && hov !== t) sqs[hov].classList.remove('hov');
+    if (ok) sqs[t].classList.add('hov');
+    hov = ok ? t : -1;
+  }
+  function cancelDrag() {
+    if (ghost) ghost.remove();
+    ghost = null;
+    if (hov >= 0) $('board').children[hov].classList.remove('hov');
+    hov = -1;
+    if (press && press.pc) press.pc.classList.remove('dragging');
+    press = null;
+  }
+  const boardEl = $('board');
+  // A press on your own piece selects it immediately; moving 6px turns it into a drag.
+  // Releasing without dragging is a tap (tapping the already-selected piece deselects it).
+  boardEl.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || !canAct()) return;
+    const t = e.target.closest('.sq'); if (!t) return;
+    cancelDrag();
+    const i = +t.dataset.i, p = S.b[i];
+    press = { i, x: e.clientX, y: e.clientY, id: e.pointerId, fresh: false, drag: false, pc: null };
+    if (p && E.colorOf(p) === PLAYER) {
+      A();
+      if (selected !== i) { selected = i; sfx.tick(); render(); press.fresh = true; }
+      try { boardEl.setPointerCapture(e.pointerId); } catch (x) {}
+    }
+  });
+  boardEl.addEventListener('pointermove', (e) => {
+    if (!press || e.pointerId !== press.id) return;
+    if (!press.drag) {
+      if (selected !== press.i || Math.hypot(e.clientX - press.x, e.clientY - press.y) < 6) return;
+      if (!startDrag(press)) return;
+      press.drag = true;
+    }
+    moveDrag(e);
+  });
+  boardEl.addEventListener('pointerup', (e) => {
+    if (!press || e.pointerId !== press.id) return;
+    const pr = press;
+    if (pr.drag) {
+      const t = hov, gr = ghost.getBoundingClientRect();
+      cancelDrag();
+      if (t >= 0) { dragRect = gr; tryMoveTo(pr.i, t); dragRect = null; }
+      return;
+    }
+    press = null;
+    if (!pr.fresh) tapSquare(pr.i);
+  });
+  boardEl.addEventListener('pointercancel', cancelDrag);
+  // Keyboard (Enter/Space on a focused square) arrives as a click with detail 0; pointer
+  // taps were already handled above.
+  boardEl.addEventListener('click', (e) => { if (e.detail !== 0) return; const t = e.target.closest('.sq'); if (t) tapSquare(+t.dataset.i); });
+
+  /* ---------- promotion picker ---------- */
+  const PROMO_LABEL = { q: 'SLAY QUEEN', r: 'TOWER', b: 'WIZARD', n: 'HORSE (BASED)' };
+  function showPromo(ms) {
+    promoOpen = true; render();
+    const box = $('promoopts'); box.innerHTML = '';
+    for (const k of 'qrbn') {
+      const m = ms.find((x) => x.promo === k); if (!m) continue;
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'po';
+      b.innerHTML = `<i>${glyph(k)}</i><span>${PROMO_LABEL[k]}</span>`;
+      b.addEventListener('click', () => { closePromo(); play(m, 'you'); });
+      box.appendChild(b);
+    }
+    $('promo').hidden = false; box.firstChild.focus();
+  }
+  function closePromo() { promoOpen = false; $('promo').hidden = true; }
+  $('promocancel').addEventListener('click', () => { closePromo(); selected = -1; render(); });
+  $('promo').addEventListener('keydown', (e) => { if (e.key === 'Escape') $('promocancel').click(); });
 
   function play(m, who, prevHand) { commit(E.apply(S, m), m, who, prevHand); }
   function commit(ns, m, who, prevHand) {
     clearInterval(timerId); $('timewrap').classList.remove('on');
     history.push({ S, key: E.key(S), lastMove, aura, combo, plyCount, hand: prevHand || hand.slice() });
-    const mover = S.turn, evalBefore = evalW, bestBefore = bestForPlayer, choices = legal.length;
+    const mover = S.turn, beforeP = evalP, g = gen, choices = legal.length;
     const fromRects = captureRects(m);
     S = ns; lastMove = m; selected = -1; plyCount++;
     let st = E.status(S);
@@ -511,9 +661,14 @@
     legal = E.legalMoves(S);
     render();
     animateMove(m, fromRects);
-    updateEval(st);
+    // Eval of the new position comes back from the worker; grading needs the one before too.
+    const myP = evalP = requestEval(st);
+    Promise.all([beforeP, myP]).then(([b, a]) => {
+      if (g !== gen) return; // game reset or UNO'd while the engine was thinking
+      if (evalP === myP) showEval(a);
+      if (st === 'play' && b) judge(m, who, b, a, choices);
+    });
     react(m, who, mover, st, gaveCheck);
-    if (st === 'play') judge(m, who, evalBefore, bestBefore, choices);
     if (who === 'ai' && plyCount % 8 === 0) grantCard();
     if (who !== 'ai' && combo === 3) grantCard();
     if (plyCount % 14 === 7 && st === 'play') showSponsor();
@@ -536,7 +691,7 @@
   function captureRects(m) {
     const out = [], b = $('board').children;
     const add = (f, t) => { const pc = b[f] && b[f].querySelector('.pc'); if (pc) out.push({ t, r: pc.getBoundingClientRect() }); };
-    if (m.f !== m.t) add(m.f, m.t);
+    if (m.f !== m.t) { if (dragRect) out.push({ t: m.t, r: dragRect }); else add(m.f, m.t); }
     if (m.castle) { const h = m.f; if (m.castle === 'K') add(h + 3, h + 1); else add(h - 4, h - 1); }
     return out;
   }
@@ -549,7 +704,8 @@
     }
     for (const { t, r } of rects) {
       const pc = b[t] && b[t].querySelector('.pc'); if (!pc) continue;
-      const nr = pc.getBoundingClientRect(), dx = r.left - nr.left, dy = r.top - nr.top;
+      const nr = pc.getBoundingClientRect();
+      const dx = r.left + r.width / 2 - (nr.left + nr.width / 2), dy = r.top + r.height / 2 - (nr.top + nr.height / 2);
       pc.style.zIndex = 5;
       const frames = reduceMotion
         ? [{ transform: `translate(${dx}px,${dy}px)` }, { transform: 'none' }]
@@ -565,30 +721,35 @@
     const vibe = cp > 400 ? 'YOU ARE COOKING 🍳' : cp > 120 ? 'SLIGHT AURA LEAD' : cp >= -120 ? "IT'S GIVING EVEN" : cp >= -400 ? 'BOT IS FARMING AURA' : 'YOU ARE COOKED 💀';
     return `${vibe} (${cp > 0 ? '+' : ''}${(cp / 100).toFixed(1)})`;
   }
-  // Engine eval of the current position from the player's (white's) side. On the player's
-  // turn this also remembers the engine's preferred move, for "BEST MOVE" grading.
-  function updateEval(st) {
-    let cp = 0, mate = 0, pct = 50, label;
-    bestForPlayer = null;
-    if (st === 'checkmate') { cp = S.turn === PLAYER ? -E.MATE : E.MATE; pct = cp > 0 ? 100 : 0; label = cp > 0 ? 'YOU WON. ABSOLUTE CINEMA' : 'BOT WON. CERTIFIED L'; }
-    else if (st !== 'play') label = 'DRAW. NOBODY ATE';
-    else {
-      const r = E.search(S, 2);
-      cp = S.turn === 'w' ? r.score : -r.score;
-      if (Math.abs(r.score) > E.MATE - 100) mate = Math.ceil((E.MATE - Math.abs(r.score)) / 2) * Math.sign(cp);
-      if (S.turn === PLAYER) bestForPlayer = r.move;
-      pct = mate ? (mate > 0 ? 96 : 4) : 50 + 46 * Math.tanh(cp / 500);
-      label = evalLabel(cp, mate);
-    }
-    evalW = cp;
+  // Engine eval of the current position from the player's (white's) side, as a promise of
+  // { st, cp, mate, best }. On the player's turn `best` is the engine's preferred move.
+  function requestEval(st) {
+    const pos = S;
+    if (st === 'checkmate') return Promise.resolve({ st, cp: pos.turn === PLAYER ? -E.MATE : E.MATE, mate: 0, best: null });
+    if (st !== 'play') return Promise.resolve({ st, cp: 0, mate: 0, best: null });
+    return think('search', pos, 2).then((r) => {
+      const cp = pos.turn === 'w' ? r.score : -r.score;
+      const mate = Math.abs(r.score) > E.MATE - 100 ? Math.ceil((E.MATE - Math.abs(r.score)) / 2) * Math.sign(cp) : 0;
+      return { st, cp, mate, best: pos.turn === PLAYER ? r.move : null };
+    });
+  }
+  function showEval(ev) {
+    let pct = 50, label;
+    if (ev.st === 'checkmate') { pct = ev.cp > 0 ? 100 : 0; label = ev.cp > 0 ? 'YOU WON. ABSOLUTE CINEMA' : 'BOT WON. CERTIFIED L'; }
+    else if (ev.st !== 'play') label = 'DRAW. NOBODY ATE';
+    else { pct = ev.mate ? (ev.mate > 0 ? 96 : 4) : 50 + 46 * Math.tanh(ev.cp / 500); label = evalLabel(ev.cp, ev.mate); }
     $('evalfill').style.width = pct + '%';
     $('evaltxt').textContent = label;
   }
+  function refreshEval() {
+    const g = gen, p = evalP = requestEval('play');
+    p.then((ev) => { if (g === gen && evalP === p) showEval(ev); });
+  }
   // Thresholds calibrated by self-play: sound engine moves trip "blunder" <1% of the time,
   // random moves ~30%.
-  function judge(m, who, before, best, choices) {
+  function judge(m, who, b, a, choices) {
     if (m.card || who === 'brain') return;
-    const delta = clampCp(evalW) - clampCp(before);
+    const delta = clampCp(a.cp) - clampCp(b.cp), best = b.best;
     if (who === 'ai') {
       if (delta >= 250) { popup('BOT BLUNDERED 🤡', '#b6ff1a'); chatSay('botL', 2); setAura(aura + 40); setTimeout(() => npcSay(rand(NPC.oops)), 700); }
       return;
@@ -603,11 +764,14 @@
   function aiTurn() {
     thinking = true; render();
     setStatus('NPC IS COOKING 🍳🍳🍳');
-    aiTimer = setTimeout(() => {
-      const m = E.bestMove(S, level, seenMap());
-      thinking = false;
-      if (m) play(m, 'ai');
-    }, 500 + Math.random() * 400);
+    const g = gen, t0 = performance.now(), wait = 500 + Math.random() * 400;
+    think('bestMove', S, level, seenMap()).then((m) => {
+      aiTimer = setTimeout(() => {
+        if (g !== gen) return;
+        thinking = false;
+        if (m) play(m, 'ai'); else render();
+      }, Math.max(0, wait - (performance.now() - t0)));
+    });
   }
 
   /* ---------- the brainrot ---------- */
@@ -642,6 +806,7 @@
     }
     if (m.castle) { popup(rand(TEXT.castle), '#ffe600'); chatSay('idle', 1); }
     if (m.promo) { sfx.promo(); shake(false); burstAtSquare(m.t, ['👑', '💅', '✨', '💖'], 24); popup(rand(TEXT.promo), '#ff2bd6'); addLikes(300); }
+    if (m.promo && m.promo !== 'q' && isMine) { popup(rand(TEXT.under), '#b6ff1a'); setAura(aura + 150); chatSay('capture', 3); speak('underpromotion'); }
     if (gaveCheck && st === 'play') {
       sfx.check(); popup(rand(TEXT.check), '#ff3b3b');
       chatSay('check', 2); addLikes(40);
@@ -684,7 +849,7 @@
   }
 
   /* ---------- brainrot cards ---------- */
-  const canUseCard = () => !over && !thinking && S.turn === PLAYER && !E.inCheck(S);
+  const canUseCard = () => !over && !thinking && !promoOpen && S.turn === PLAYER && !E.inCheck(S);
   function renderHand() {
     const el = $('hand'), ok = canUseCard(), hk = hand.join(',') + '|' + ok;
     if (hk === handKey && freshCard < 0) return; // unchanged: don't rebuild on every tap
@@ -715,7 +880,10 @@
     if (kind === 'brain') {
       hand.splice(i, 1); popup('BIG BRAIN TIME 🧠', '#ff2bd6'); speak('Big brain time'); sfx.combo(5);
       thinking = true; render(); setStatus('BIG BRAIN IS COOKING 🧠');
-      aiTimer = setTimeout(() => { const bm = E.bestMove(S, 2, seenMap()); thinking = false; if (bm) play(bm, 'brain', prevHand); else render(); }, 400);
+      const g = gen;
+      think('bestMove', S, 2, seenMap()).then((bm) => {
+        aiTimer = setTimeout(() => { if (g !== gen) return; thinking = false; if (bm) play(bm, 'brain', prevHand); else render(); }, 300);
+      });
       return;
     }
     if (kind === 'flush') {
@@ -883,6 +1051,7 @@
       if (left <= 0) {
         clearInterval(timerId);
         if (over || thinking || S.turn !== PLAYER) return;
+        closePromo(); cancelDrag();
         const ms = legal.filter((m) => !m.promo || m.promo === 'q');
         popup(rand(TEXT.slow), '#ff3b3b'); chatSay('lost', 2); setAura(aura - 15);
         if (ms.length) play(rand(ms), 'timeout');
@@ -891,7 +1060,6 @@
   }
 
   /* ---------- buttons ---------- */
-  $('board').addEventListener('click', (e) => { const t = e.target.closest('.sq'); if (t) onSquare(+t.dataset.i); });
   $('heartbtn').addEventListener('click', (e) => {
     A(); addLikes(1 + Math.floor(Math.random() * 4));
     const r = e.currentTarget.getBoundingClientRect(); heartBurst(r.left + r.width / 2, r.top + r.height / 2, 5);
@@ -899,11 +1067,12 @@
   });
   $('unobtn').addEventListener('click', () => {
     if ($('unobtn').disabled) return;
+    gen++; // drop any engine results for the moves being undone
     const h = history[history.length - 2]; history.length -= 2;
     S = h.S; lastMove = h.lastMove; setAura(h.aura - 20); setCombo(h.combo); selected = -1; legal = E.legalMoves(S); unoLeft = false;
     plyCount = h.plyCount; hand = h.hand.slice(); handKey = '';
     sfx.uno(); popup(rand(TEXT.uno), '#ff2bd6'); shake(false); chatSay('idle', 2);
-    render(); updateEval('play'); setStatus('TIME LOOP USED. NO MORE UNO THIS GAME.'); startTurnTimer();
+    render(); refreshEval(); setStatus('TIME LOOP USED. NO MORE UNO THIS GAME.'); startTurnTimer();
   });
   $('adhdbtn').addEventListener('click', (e) => {
     A(); adhd = !adhd; e.currentTarget.classList.toggle('on', adhd);

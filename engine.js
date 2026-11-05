@@ -6,7 +6,14 @@
  * State: { b: board, turn: 'w'|'b', cast: {K,Q,k,q}, ep: index|-1, half: plies since capture/pawn move }
  * Move:  { f, t, piece, cap, promo, ep, castle }
  */
-(function (root) {
+(function (root, factory) {
+  const api = factory();
+  // The factory's own source text, so a page can start the engine inside a Web Worker
+  // (new Worker(blob URL)) without needing a separate file the sandbox might block.
+  api.source = factory.toString();
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.ChessEngine = api;
+})(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
 
   const colorOf = (ch) => (ch === ch.toUpperCase() ? 'w' : 'b');
@@ -364,6 +371,5 @@
     colorOf, other, sqName, fromFEN, initial, isAttacked, findKing,
     legalMoves, apply, inCheck, status, perft, bestMove, search, evaluate, key, VAL, MATE,
   };
-  if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  else root.ChessEngine = api;
-})(typeof window !== 'undefined' ? window : globalThis);
+  return api;
+});
