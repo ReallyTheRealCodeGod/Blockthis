@@ -1,5 +1,10 @@
 // Run: node tests/engine.test.js
 const E = require('../engine.js');
+// The bot adds random noise to its choices. Seed it so this suite plays the same games every
+// run (a small LCG). Measured over ~150 unseeded games: SIGMA converts K+Q/K+R vs K 100% of
+// the time, GIGACHAD ~99%.
+let seed = 20261105;
+Math.random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
 let fails = 0;
 const check = (name, ok, extra = '') => { console.log((ok ? 'ok   ' : 'FAIL ') + name + (extra ? '  ' + extra : '')); if (!ok) fails++; };
 
@@ -25,15 +30,23 @@ check('halfmove clock counts quiet moves', kn.half === 1);
 check('pawn move resets halfmove clock', E.apply(kn, E.legalMoves(kn).find((m) => m.f === 12 && m.t === 28)).half === 0);
 
 // The bot must convert basic won endgames (needs the mop-up eval) and find mate in 1.
+// Moves are randomized, so each case runs several games, under real draw rules.
 const mate1 = E.bestMove(E.fromFEN('6k1/5ppp/8/8/8/8/8/R3K3 w - -'), 2);
 check('finds back-rank mate in 1', E.sqName(mate1.f) + E.sqName(mate1.t) === 'a1a8');
 for (const [name, fen] of [['K+Q vs K', '8/8/8/4k3/8/8/8/3QK3 w - -'], ['K+R vs K', '8/8/8/4k3/8/8/8/R3K3 w - -']]) {
-  let p = E.fromFEN(fen), n = 0; const seen = new Map();
-  while (n < 120 && E.status(p) === 'play') {
-    const k = E.key(p); seen.set(k, (seen.get(k) || 0) + 1);
-    p = E.apply(p, E.bestMove(p, 2, seen)); n++;
+  for (const level of [1, 2]) {
+    let mated = 0, worst = 0;
+    for (let g = 0; g < 6; g++) {
+      let p = E.fromFEN(fen), n = 0; const seen = new Map();
+      while (E.status(p) === 'play') { // stops at mate, stalemate, or the 50-move rule
+        const k = E.key(p); seen.set(k, (seen.get(k) || 0) + 1);
+        if (seen.get(k) >= 3) break; // threefold repetition
+        p = E.apply(p, E.bestMove(p, level, seen)); n++;
+      }
+      if (E.status(p) === 'checkmate') { mated++; worst = Math.max(worst, Math.ceil(n / 2)); }
+    }
+    check(`bot (level ${level}) mates with ${name}`, mated === 6, `${mated}/6 games, slowest ${worst} moves`);
   }
-  check('bot mates with ' + name, E.status(p) === 'checkmate', 'in ' + Math.ceil(n / 2) + ' moves');
 }
 
 // search() reports mate scores the UI can turn into "mate in N".

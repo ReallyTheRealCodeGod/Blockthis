@@ -275,15 +275,18 @@
       const back = white ? r === 7 : r === 0;
       return (back ? 15 : -20) + (back && (f <= 2 || f >= 6) ? 15 : 0);
     };
-    if (wk >= 0) score += kingTerm(wk, true);
-    if (bk >= 0) score -= kingTerm(bk, false);
     // "Mop-up": when clearly winning an endgame, herd the losing king to the edge and walk
     // our king toward it. Without this a shallow search can't see the mate and just shuffles.
-    if (endgame && wk >= 0 && bk >= 0 && Math.abs(mat) >= 300) {
+    // The winning king drops its centralisation pull here: otherwise staying central (+6 a
+    // step) outweighs approaching (+5 a step) and it never comes over to help mate.
+    const mopping = endgame && wk >= 0 && bk >= 0 && Math.abs(mat) >= 300;
+    if (wk >= 0 && !(mopping && mat > 0)) score += kingTerm(wk, true);
+    if (bk >= 0 && !(mopping && mat < 0)) score -= kingTerm(bk, false);
+    if (mopping) {
       const weak = mat > 0 ? bk : wk, strong = mat > 0 ? wk : bk;
       const edge = Math.abs((weak & 7) - 3.5) + Math.abs((weak >> 3) - 3.5); // 1 (centre) .. 7 (corner)
       const dist = Math.abs((weak & 7) - (strong & 7)) + Math.abs((weak >> 3) - (strong >> 3));
-      const mop = edge * 12 + (14 - dist) * 5;
+      const mop = edge * 12 + (14 - dist) * 10;
       score += mat > 0 ? mop : -mop;
     }
     return s.turn === 'w' ? score : -score;
@@ -338,13 +341,17 @@
     return { score: alpha, move: best };
   }
 
-  // level 0: sloppy (depth 1 + big noise), 1: depth 2, 2: depth 3.
+  // level 0: sloppy (depth 1 + big noise), 1: depth 2, 2: depth 3 (4 in bare endgames).
   // seen (optional): Map of key(position) -> times it has occurred in the game. A move that
   // would make a third repetition scores as a draw (0); a winning bot avoids revisiting.
   function bestMove(s, level, seen) {
     const moves = legalMoves(s);
     if (!moves.length) return null;
-    const depth = [1, 2, 3][level] || 2;
+    // GIGACHAD looks one ply deeper in bare endgames (<= 4 pieces): branching is tiny there,
+    // and an even depth is what lets it find the opposition in K+R vs K. (SIGMA's depth 2
+    // already converts; an odd depth 3 would make it worse.)
+    const pieces = s.b.reduce((n, p) => n + (p ? 1 : 0), 0);
+    const depth = ([1, 2, 3][level] || 2) + (level === 2 && pieces <= 4 ? 1 : 0);
     const noise = [140, 12, 4][level] || 10;
     let best = null, bestScore = -Infinity, alpha = -Infinity;
     moves.sort((a, c) => orderScore(c) - orderScore(a));

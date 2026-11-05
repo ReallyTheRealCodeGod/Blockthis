@@ -16,7 +16,7 @@ Promotions open a picker; underpromoting earns bonus aura.
 - **UNO** reverse: undo your last turn (once per game)
 - **ADHD mode**: 10 seconds per move or the game plays a random one for you
 - **Skins**: meme / animals / food / classic
-- Difficulty: NPC (sloppy) → SIGMA → GIGACHAD (depth-3 search)
+- Difficulty: NPC (sloppy) → SIGMA (depth 2) → GIGACHAD (depth 3, 4 in bare endgames)
 - **Brainrot cards** (FLUSH, GLOW UP, CLOWN, BIG BRAIN), a talking trash-talk bot (speech synthesis), a beat whose tempo scales with rank, a split-screen endless-runner strip, YEET captures, fake sponsor breaks, cursor emoji trail, emoji rain and Fanum tax events
 
 `prefers-reduced-motion` turns off shake/spin/hue effects.
