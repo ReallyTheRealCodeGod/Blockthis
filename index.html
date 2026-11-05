@@ -87,8 +87,6 @@
     font-size: calc(var(--bs) / 8 * .58); line-height: 1; pointer-events: none; }
   .pc.w { background: radial-gradient(circle, rgba(25,240,255,.5), rgba(25,240,255,.08) 70%); box-shadow: 0 0 0 2px var(--cyan), 0 0 12px var(--cyan); }
   .pc.b { background: radial-gradient(circle, rgba(255,43,214,.5), rgba(255,43,214,.08) 70%); box-shadow: 0 0 0 2px var(--pink), 0 0 12px var(--pink); }
-  .pc.landed { animation: land .45s cubic-bezier(.3,1.8,.5,1); }
-  @keyframes land { 0% { transform: scale(1.8) rotate(-18deg); } 100% { transform: scale(1) rotate(0); } }
   .skin-classic .pc { font-size: calc(var(--bs) / 8 * .66); }
   .skin-classic .pc.w { color: #fff; text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 3px #000; }
   .skin-classic .pc.b { color: #111; text-shadow: 0 0 3px #fff, 0 0 3px #fff; }
@@ -128,6 +126,13 @@
   #endcard p { margin: 6px 0; font-weight: 700; }
   #endcard button { margin-top: 14px; font-size: 20px; font-weight: 900; padding: 12px 22px; border: 0; border-radius: 99px; cursor: pointer;
     background: linear-gradient(90deg, var(--cyan), var(--lime)); color: #000; }
+
+  .sq, .rb, .tb, .card, #endcard button { touch-action: manipulation; }
+  #evalwrap { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 11px; font-weight: 900; white-space: nowrap; }
+  #evalbar { position: relative; flex: 1; min-width: 0; height: 18px; border-radius: 99px; overflow: hidden; background: var(--pink); border: 1px solid rgba(255,255,255,.35); }
+  #evalfill { position: absolute; inset: 0 auto 0 0; width: 50%; background: var(--cyan); transition: width .6s cubic-bezier(.3,1.4,.5,1); }
+  #evaltxt { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 900; color: #fff;
+    text-shadow: 0 1px 2px #000, 0 0 4px #000; white-space: nowrap; overflow: hidden; letter-spacing: .3px; }
 
   /* unhinged additions */
   .pc { animation: wob 2.6s ease-in-out infinite; animation-delay: var(--d, 0s); }
@@ -188,6 +193,11 @@
     <span id="combo"></span>
   </div>
   <div id="timewrap"><div id="timebar"></div></div>
+  <div id="evalwrap" title="Who is winning, according to the engine">
+    <span>🩵 YOU</span>
+    <div id="evalbar"><div id="evalfill"></div><div id="evaltxt"></div></div>
+    <span>NPC 🤖</span>
+  </div>
 
   <div id="stage">
     <div id="boardbox"><div id="board" role="grid" aria-label="Chess board"></div></div>
@@ -265,12 +275,16 @@
     lost: ['L', 'bro got ratioed by a bot', 'NPC moment', 'fell off', 'bot has more aura', 'take the L 😭', 'oof'],
     mate: ['GGGGG', 'GOATED', 'CHAT CLIP IT', 'W W W W W', 'history was made'],
     lose: ['rip', 'L', 'respectfully... cooked', 'emotional damage'],
+    blunder: ['BLUNDER 💀', 'bro hung it', 'NAHHH', '??', 'free real estate', 'chat he is NOT locked in'],
+    botL: ['BOT IS AN NPC FR', 'the bot fell off', 'free elo', 'bot blundered LMAO', 'W player'],
   };
   const NPC = {
     cap: ['skill issue', 'ohio rizz activated', 'thanks for the free piece', 'my aura is ten times yours', 'sigma grindset'],
     check: ['your king is cooked', 'he sees you', 'look at your king. now look at me'],
     idle: ['mid player detected', 'i am literally just a bot', 'beep boop gyatt', 'calculating your downfall', 'are you even locked in'],
     hurt: ['NOOOO my pawn', 'that was fanum tax bro', 'i felt that in my cpu', 'bro you are cheating'],
+    oops: ['wait no', 'that was a test', 'my cpu sneezed', 'i meant to do that'],
+    gift: ['thank you for the free elo', 'appreciate the gift', 'bro is playing for me'],
   };
   const CARDS = {
     flush: { icon: '🚽', name: 'FLUSH', desc: 'Deletes a random enemy piece' },
@@ -323,14 +337,24 @@
   let S, history, selected, legal, lastMove, over, thinking;
   let aura, combo, likes, unoLeft, plyCount, level = 1, adhd = false, skin = 'meme', skinOverride = null;
   let timerId = null, aiTimer = null, bestAura = 0, hand = [], freshCard = -1, rankIdx = 0, voiceOn = true, beatOn = false, sponsorT = null;
+  let endTimer = null, evalW = 0, bestForPlayer = null, sqKeys = [], handKey = '', nextPopAt = 0;
   try { bestAura = +localStorage.getItem('brainrot-chess-best') || 0; } catch (e) {}
   try { const sv = localStorage.getItem('brainrot-chess-skin'); if (SKINS[sv]) skin = sv; } catch (e) {}
 
   /* ---------- dom helpers ---------- */
+  // Popups queue up (~0.45s apart) and stack in different rows, so a capture + check + combo
+  // + rank-up from one move reads as a sequence instead of one illegible pile.
   function popup(text, color) {
-    const el = document.createElement('div');
+    const now = performance.now(), at = Math.max(now, nextPopAt);
+    if (at - now > 1800) return; // backlog: drop it rather than show stale hype
+    nextPopAt = at + 450;
+    setTimeout(() => showPop(text, color), at - now);
+  }
+  function showPop(text, color) {
+    const host = $('pops'), el = document.createElement('div');
     el.className = 'pop'; el.textContent = text; el.style.color = color || rand(COLORS);
-    $('pops').appendChild(el);
+    el.style.top = [42, 64, 22][host.children.length % 3] + '%';
+    host.appendChild(el);
     const rot = (Math.random() * 14 - 7);
     const frames = [
       { transform: `translate(-50%,-50%) scale(.2) rotate(${rot * 3}deg)`, opacity: 0 },
@@ -338,8 +362,7 @@
       { transform: `translate(-50%,-50%) scale(1) rotate(${rot}deg)`, opacity: 1, offset: .7 },
       { transform: `translate(-50%,-80%) scale(.9) rotate(${rot}deg)`, opacity: 0 },
     ];
-    const a = el.animate(frames, { duration: reduceMotion ? 900 : 1300, easing: 'ease-out' });
-    a.onfinish = () => el.remove();
+    el.animate(frames, { duration: reduceMotion ? 900 : 1300, easing: 'ease-out' }).onfinish = () => el.remove();
   }
   function gainText(sqIdx, txt) {
     const sqEl = $('board').children[sqIdx]; if (!sqEl) return;
@@ -420,6 +443,7 @@
         sq.type = 'button'; sq.dataset.i = i;
         board.appendChild(sq);
       }
+      sqKeys = [];
     }
     const checkSq = E.inCheck(S) ? E.findKing(S.b, S.turn) : -1;
     const targets = new Map(legal.filter((m) => m.f === selected).map((m) => [m.t, m]));
@@ -432,11 +456,17 @@
       if (targets.has(i)) cls += ' tgt' + (targets.get(i).cap ? ' cap' : '');
       el.className = cls;
       el.setAttribute('aria-label', E.sqName(i) + (p ? ' ' + (E.colorOf(p) === 'w' ? 'white ' : 'black ') + ({ p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' })[p.toLowerCase()] : ' empty'));
-      let html = '';
-      if (f === 0) html += `<span class="co r">${8 - r}</span>`;
-      if (r === 7) html += `<span class="co f">${'abcdefgh'[f]}</span>`;
-      if (p) html += `<span class="pc ${E.colorOf(p)}${lastMove && i === lastMove.t ? ' landed' : ''}" style="--d:${-((i * 37) % 26) / 10}s">${glyph(p)}</span>`;
-      el.innerHTML = html;
+      // Only rebuild a square when its piece or skin changed: idle wobble keeps running and
+      // selecting a piece no longer re-triggers animations across the board.
+      const k = p ? p + glyph(p) : '';
+      if (sqKeys[i] !== k) {
+        sqKeys[i] = k;
+        let html = '';
+        if (f === 0) html += `<span class="co r">${8 - r}</span>`;
+        if (r === 7) html += `<span class="co f">${'abcdefgh'[f]}</span>`;
+        if (p) html += `<span class="pc ${E.colorOf(p)}" style="--d:${-((i * 37) % 26) / 10}s">${glyph(p)}</span>`;
+        el.innerHTML = html;
+      }
     }
     $('unobtn').disabled = !(unoLeft && history.length >= 2 && S.turn === PLAYER && !over && !thinking);
     renderHand();
@@ -445,7 +475,7 @@
 
   /* ---------- game flow ---------- */
   function newGame() {
-    clearTimeout(aiTimer); clearInterval(timerId);
+    clearTimeout(aiTimer); clearInterval(timerId); clearTimeout(endTimer);
     S = E.initial(); history = []; selected = -1; legal = E.legalMoves(S); lastMove = null; over = false; thinking = false;
     unoLeft = true; plyCount = 0; likes = 0; skinOverride = null; rankIdx = 0; hand = [rand(['flush', 'glow', 'brain'])]; freshCard = 0;
     clearInterval(sponsorT); $('sponsor').classList.remove('on'); $('npcsay').textContent = '';
@@ -453,7 +483,7 @@
     $('end').classList.remove('on');
     $('chat').innerHTML = '';
     chatSay('idle', 2);
-    render(); setStatus('YOUR TURN — you are the cyan team 🩵'); startTurnTimer();
+    render(); updateEval('play'); setStatus('YOUR TURN — you are the cyan team 🩵'); startTurnTimer();
   }
 
   function onSquare(i) {
@@ -464,21 +494,26 @@
       const m = legal.find((x) => x.f === selected && x.t === i && (!x.promo || x.promo === 'q'));
       if (m) { play(m, 'you'); return; }
     }
-    if (p && E.colorOf(p) === PLAYER) { selected = i; sfx.tick(); } else selected = -1;
+    if (p && E.colorOf(p) === PLAYER && i !== selected) { selected = i; sfx.tick(); } else selected = -1;
     render();
   }
 
-  function play(m, who) { commit(E.apply(S, m), m, who); }
-  function commit(ns, m, who) {
+  function play(m, who, prevHand) { commit(E.apply(S, m), m, who, prevHand); }
+  function commit(ns, m, who, prevHand) {
     clearInterval(timerId); $('timewrap').classList.remove('on');
-    history.push({ S, lastMove, aura, combo });
-    const mover = S.turn;
+    history.push({ S, key: E.key(S), lastMove, aura, combo, plyCount, hand: prevHand || hand.slice() });
+    const mover = S.turn, evalBefore = evalW, bestBefore = bestForPlayer, choices = legal.length;
+    const fromRects = captureRects(m);
     S = ns; lastMove = m; selected = -1; plyCount++;
-    const st = E.status(S);
+    let st = E.status(S);
+    if (st === 'play' && repetitions() >= 3) st = 'repetition';
     const gaveCheck = E.inCheck(S);
     legal = E.legalMoves(S);
     render();
+    animateMove(m, fromRects);
+    updateEval(st);
     react(m, who, mover, st, gaveCheck);
+    if (st === 'play') judge(m, who, evalBefore, bestBefore, choices);
     if (who === 'ai' && plyCount % 8 === 0) grantCard();
     if (who !== 'ai' && combo === 3) grantCard();
     if (plyCount % 14 === 7 && st === 'play') showSponsor();
@@ -488,11 +523,88 @@
     chaosMaybe();
   }
 
+  /* ---------- repetition ---------- */
+  function repetitions() { const k = E.key(S); let n = 1; for (const h of history) if (h.key === k) n++; return n; }
+  function seenMap() {
+    const mp = new Map(), add = (k) => mp.set(k, (mp.get(k) || 0) + 1);
+    for (const h of history) add(h.key);
+    add(E.key(S));
+    return mp;
+  }
+
+  /* ---------- move animation (FLIP: measure before render, slide from there) ---------- */
+  function captureRects(m) {
+    const out = [], b = $('board').children;
+    const add = (f, t) => { const pc = b[f] && b[f].querySelector('.pc'); if (pc) out.push({ t, r: pc.getBoundingClientRect() }); };
+    if (m.f !== m.t) add(m.f, m.t);
+    if (m.castle) { const h = m.f; if (m.castle === 'K') add(h + 3, h + 1); else add(h - 4, h - 1); }
+    return out;
+  }
+  function animateMove(m, rects) {
+    const b = $('board').children;
+    if (!rects.length) { // card effects: the changed piece pops in place
+      const pc = b[m.t] && b[m.t].querySelector('.pc');
+      if (pc && !reduceMotion) pc.animate([{ transform: 'scale(2) rotate(-25deg)' }, { transform: 'none' }], { duration: 450, easing: 'cubic-bezier(.3,1.8,.5,1)' });
+      return;
+    }
+    for (const { t, r } of rects) {
+      const pc = b[t] && b[t].querySelector('.pc'); if (!pc) continue;
+      const nr = pc.getBoundingClientRect(), dx = r.left - nr.left, dy = r.top - nr.top;
+      pc.style.zIndex = 5;
+      const frames = reduceMotion
+        ? [{ transform: `translate(${dx}px,${dy}px)` }, { transform: 'none' }]
+        : [{ transform: `translate(${dx}px,${dy}px) scale(1.15)` }, { transform: 'scale(1.3,.75)', offset: .78 }, { transform: 'none' }];
+      pc.animate(frames, { duration: reduceMotion ? 120 : 280, easing: 'cubic-bezier(.25,.9,.35,1)' }).onfinish = () => { pc.style.zIndex = ''; };
+    }
+  }
+
+  /* ---------- eval bar + move grading ---------- */
+  const clampCp = (v) => Math.max(-2000, Math.min(2000, v));
+  function evalLabel(cp, mate) {
+    if (mate) return mate > 0 ? `YOU HAVE MATE IN ${mate} 👀` : `BOT HAS MATE IN ${-mate} 💀`;
+    const vibe = cp > 400 ? 'YOU ARE COOKING 🍳' : cp > 120 ? 'SLIGHT AURA LEAD' : cp >= -120 ? "IT'S GIVING EVEN" : cp >= -400 ? 'BOT IS FARMING AURA' : 'YOU ARE COOKED 💀';
+    return `${vibe} (${cp > 0 ? '+' : ''}${(cp / 100).toFixed(1)})`;
+  }
+  // Engine eval of the current position from the player's (white's) side. On the player's
+  // turn this also remembers the engine's preferred move, for "BEST MOVE" grading.
+  function updateEval(st) {
+    let cp = 0, mate = 0, pct = 50, label;
+    bestForPlayer = null;
+    if (st === 'checkmate') { cp = S.turn === PLAYER ? -E.MATE : E.MATE; pct = cp > 0 ? 100 : 0; label = cp > 0 ? 'YOU WON. ABSOLUTE CINEMA' : 'BOT WON. CERTIFIED L'; }
+    else if (st !== 'play') label = 'DRAW. NOBODY ATE';
+    else {
+      const r = E.search(S, 2);
+      cp = S.turn === 'w' ? r.score : -r.score;
+      if (Math.abs(r.score) > E.MATE - 100) mate = Math.ceil((E.MATE - Math.abs(r.score)) / 2) * Math.sign(cp);
+      if (S.turn === PLAYER) bestForPlayer = r.move;
+      pct = mate ? (mate > 0 ? 96 : 4) : 50 + 46 * Math.tanh(cp / 500);
+      label = evalLabel(cp, mate);
+    }
+    evalW = cp;
+    $('evalfill').style.width = pct + '%';
+    $('evaltxt').textContent = label;
+  }
+  // Thresholds calibrated by self-play: sound engine moves trip "blunder" <1% of the time,
+  // random moves ~30%.
+  function judge(m, who, before, best, choices) {
+    if (m.card || who === 'brain') return;
+    const delta = clampCp(evalW) - clampCp(before);
+    if (who === 'ai') {
+      if (delta >= 250) { popup('BOT BLUNDERED 🤡', '#b6ff1a'); chatSay('botL', 2); setAura(aura + 40); setTimeout(() => npcSay(rand(NPC.oops)), 700); }
+      return;
+    }
+    if (delta <= -250) { popup('BLUNDER ?? 💀', '#ff3b3b'); setAura(aura - 50); chatSay('blunder', 3); sfx.lost(); setTimeout(() => npcSay(rand(NPC.gift)), 300); }
+    else if (delta <= -120) { popup('MISTAKE ?', '#ff8a1a'); setAura(aura - 15); chatSay('blunder', 1); }
+    else if (best && choices > 1 && best.f === m.f && best.t === m.t) {
+      popup('BEST MOVE ⭐', '#19f0ff'); setAura(aura + 20); [1047, 1319, 1568].forEach((f, i) => tone(f, 0.08, 'triangle', 0.07, null, i * 0.06));
+    }
+  }
+
   function aiTurn() {
     thinking = true; render();
     setStatus('NPC IS COOKING 🍳🍳🍳');
     aiTimer = setTimeout(() => {
-      const m = E.bestMove(S, level);
+      const m = E.bestMove(S, level, seenMap());
       thinking = false;
       if (m) play(m, 'ai');
     }, 500 + Math.random() * 400);
@@ -501,8 +613,7 @@
   /* ---------- the brainrot ---------- */
   function react(m, who, mover, st, gaveCheck) {
     const isCap = !!m.cap, isMine = who !== 'ai', val = isCap ? E.VAL[m.cap.toLowerCase()] : 0;
-    const sqEl = $('board').children[m.t].getBoundingClientRect();
-    const cx = sqEl.left + sqEl.width / 2, cy = sqEl.top + sqEl.height / 2;
+    const capSq = m.ep ? m.t + (mover === 'w' ? 8 : -8) : m.t;
     sfx.move(m.t);
 
     if (isMine) {
@@ -518,12 +629,11 @@
       gainText(m.t, `+${Math.round(pts)} AURA`);
       if (combo >= 2) { sfx.combo(combo); popup(`COMBO x${combo}!!`, '#b6ff1a'); }
     } else {
-      setCombo(0);
       if (isCap) { setAura(aura - val / 8); gainText(m.t, `−${Math.round(val / 8)} AURA`); }
     }
 
     if (isCap) {
-      sfx.boom(); shake(val >= 500); buzz(40); yeet(m.t, m.cap);
+      sfx.boom(); shake(val >= 500); buzz(40); yeet(capSq, m.cap);
       burstAtSquare(m.t, isMine ? ['💥', '🔥', '✨', '🗿'] : ['💀', '😭', '📉'], val >= 500 ? 20 : 10);
       { const tx = rand(isMine ? TEXT.capture : TEXT.lost); popup(tx, isMine ? undefined : '#ff3b3b'); speak(tx); }
       if (!isMine) sfx.lost();
@@ -533,7 +643,7 @@
     if (m.castle) { popup(rand(TEXT.castle), '#ffe600'); chatSay('idle', 1); }
     if (m.promo) { sfx.promo(); shake(false); burstAtSquare(m.t, ['👑', '💅', '✨', '💖'], 24); popup(rand(TEXT.promo), '#ff2bd6'); addLikes(300); }
     if (gaveCheck && st === 'play') {
-      sfx.check(); setTimeout(() => popup(rand(TEXT.check), '#ff3b3b'), isCap ? 500 : 0);
+      sfx.check(); popup(rand(TEXT.check), '#ff3b3b');
       chatSay('check', 2); addLikes(40);
     }
     if (!isCap && !m.castle && !m.promo && !gaveCheck && Math.random() < 0.35) chatSay('idle', 1);
@@ -576,9 +686,10 @@
   /* ---------- brainrot cards ---------- */
   const canUseCard = () => !over && !thinking && S.turn === PLAYER && !E.inCheck(S);
   function renderHand() {
-    const el = $('hand'); el.innerHTML = '';
+    const el = $('hand'), ok = canUseCard(), hk = hand.join(',') + '|' + ok;
+    if (hk === handKey && freshCard < 0) return; // unchanged: don't rebuild on every tap
+    handKey = hk; el.innerHTML = '';
     if (!hand.length) { el.innerHTML = '<span class="nohand">NO CARDS. A new one drops every 8 plies, or when you hit a x3 combo.</span>'; return; }
-    const ok = canUseCard();
     hand.forEach((k, i) => {
       const c = CARDS[k], b = document.createElement('button');
       b.type = 'button'; b.className = 'card' + (i === freshCard ? ' fresh' : ''); b.disabled = !ok; b.title = c.desc;
@@ -600,10 +711,11 @@
     const clearCorner = (sq) => { if (sq === 63) cast.K = false; if (sq === 56) cast.Q = false; if (sq === 7) cast.k = false; if (sq === 0) cast.q = false; };
     const idxs = (fn) => b.map((p, k) => (p && fn(p) ? k : -1)).filter((k) => k >= 0);
     let m;
+    const prevHand = hand.slice();
     if (kind === 'brain') {
       hand.splice(i, 1); popup('BIG BRAIN TIME 🧠', '#ff2bd6'); speak('Big brain time'); sfx.combo(5);
       thinking = true; render(); setStatus('BIG BRAIN IS COOKING 🧠');
-      setTimeout(() => { const bm = E.bestMove(S, 2); thinking = false; if (bm) play(bm, 'you'); else render(); }, 400);
+      aiTimer = setTimeout(() => { const bm = E.bestMove(S, 2, seenMap()); thinking = false; if (bm) play(bm, 'brain', prevHand); else render(); }, 400);
       return;
     }
     if (kind === 'flush') {
@@ -619,8 +731,8 @@
       b[t] = 'n'; clearCorner(t); m = { f: t, t, piece: 'x', cap: null, promo: null, castle: null };
       popup('CLOWNED 🤡', '#ff8a1a'); speak('Clowned'); burstAtSquare(t, ['🤡', '🎈', '🤣'], 16);
     }
-    hand.splice(i, 1); sfx.uno(); shake(true);
-    commit({ b, turn: 'b', cast, ep: -1 }, m, 'you');
+    m.card = kind; hand.splice(i, 1); sfx.uno(); shake(true);
+    commit({ b, turn: 'b', cast, ep: -1, half: 0 }, m, 'you', prevHand);
   }
 
   /* ---------- sponsor break ---------- */
@@ -745,10 +857,13 @@
         title = rand(TEXT.lose); sub = 'CHECKMATE. THE BOT HAS MORE AURA THAN YOU.'; sfx.sad(); chatSay('lose', 4); popup('YOU GOT COOKED 💀', '#ff3b3b');
       }
     } else {
-      title = 'DRAW?? 😐'; sub = st === 'stalemate' ? 'STALEMATE. NOBODY ATE. BORING.' : 'NOT ENOUGH PIECES. THE LORE ENDS HERE.'; sfx.sad(); chatSay('lose', 2);
+      title = 'DRAW?? 😐';
+      sub = ({ stalemate: 'STALEMATE. NOBODY ATE. BORING.', repetition: 'SAME POSITION 3 TIMES. THE LOOP IS REAL.',
+        fifty: '50 MOVES WITH NO CAPTURE OR PAWN MOVE. TOUCH GRASS.' })[st] || 'NOT ENOUGH PIECES. THE LORE ENDS HERE.';
+      sfx.sad(); chatSay('lose', 2);
     }
     setStatus(title);
-    setTimeout(() => {
+    endTimer = setTimeout(() => {
       $('endtitle').textContent = title; $('endsub').textContent = sub;
       $('endscore').textContent = `AURA: ${aura} (${rankFor(aura)}) · BEST: ${bestAura}`;
       $('end').classList.add('on');
@@ -786,8 +901,9 @@
     if ($('unobtn').disabled) return;
     const h = history[history.length - 2]; history.length -= 2;
     S = h.S; lastMove = h.lastMove; setAura(h.aura - 20); setCombo(h.combo); selected = -1; legal = E.legalMoves(S); unoLeft = false;
+    plyCount = h.plyCount; hand = h.hand.slice(); handKey = '';
     sfx.uno(); popup(rand(TEXT.uno), '#ff2bd6'); shake(false); chatSay('idle', 2);
-    render(); setStatus('TIME LOOP USED. NO MORE UNO THIS GAME.'); startTurnTimer();
+    render(); updateEval('play'); setStatus('TIME LOOP USED. NO MORE UNO THIS GAME.'); startTurnTimer();
   });
   $('adhdbtn').addEventListener('click', (e) => {
     A(); adhd = !adhd; e.currentTarget.classList.toggle('on', adhd);

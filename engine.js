@@ -3,7 +3,7 @@
  *
  * Board: array of 64 cells, index = rank_from_top * 8 + file. Index 0 = a8, 63 = h1.
  * Pieces: uppercase = white, lowercase = black, null = empty.
- * State: { b: board, turn: 'w'|'b', cast: {K,Q,k,q}, ep: index|-1 }
+ * State: { b: board, turn: 'w'|'b', cast: {K,Q,k,q}, ep: index|-1, half: plies since capture/pawn move }
  * Move:  { f, t, piece, cap, promo, ep, castle }
  */
 (function (root) {
@@ -14,7 +14,7 @@
   const sqName = (i) => 'abcdefgh'[i & 7] + (8 - (i >> 3));
 
   function fromFEN(fen) {
-    const [rows, turn, cast, ep] = fen.split(' ');
+    const [rows, turn, cast, ep, half] = fen.split(' ');
     const b = [];
     for (const row of rows.split('/')) {
       for (const ch of row) {
@@ -31,6 +31,7 @@
         k: castStr.includes('k'), q: castStr.includes('q'),
       },
       ep: ep && ep !== '-' ? 'abcdefgh'.indexOf(ep[0]) + (8 - +ep[1]) * 8 : -1,
+      half: +half || 0,
     };
   }
 
@@ -182,7 +183,15 @@
       if (sq === 0) cast.q = false;
     }
     const ep = piece.toLowerCase() === 'p' && Math.abs(m.t - m.f) === 16 ? (m.f + m.t) / 2 : -1;
-    return { b, turn: other(us), cast, ep };
+    const half = piece.toLowerCase() === 'p' || m.cap ? 0 : (s.half || 0) + 1;
+    return { b, turn: other(us), cast, ep, half };
+  }
+
+  // Identity of a position for repetition counting (board, side to move, castling, ep).
+  function key(s) {
+    let k = '';
+    for (let i = 0; i < 64; i++) k += s.b[i] || '.';
+    return k + s.turn + (s.cast.K ? 'K' : '') + (s.cast.Q ? 'Q' : '') + (s.cast.k ? 'k' : '') + (s.cast.q ? 'q' : '') + s.ep;
   }
 
   function inCheck(s) {
@@ -208,11 +217,13 @@
     return false;
   }
 
-  // 'play' | 'checkmate' | 'stalemate' | 'draw'
+  // 'play' | 'checkmate' | 'stalemate' | 'draw' (insufficient material) | 'fifty'
+  // Threefold repetition needs the game history, so the caller checks that with key().
   function status(s) {
     const moves = legalMoves(s);
     if (!moves.length) return inCheck(s) ? 'checkmate' : 'stalemate';
     if (insufficient(s.b)) return 'draw';
+    if ((s.half || 0) >= 100) return 'fifty';
     return 'play';
   }
 
@@ -229,27 +240,44 @@
 
   function evaluate(s) {
     // score from the side-to-move's perspective
-    let score = 0;
+    let score = 0, npm = 0, mat = 0, wk = -1, bk = -1;
     for (let i = 0; i < 64; i++) {
       const p = s.b[i];
       if (!p) continue;
       const kind = p.toLowerCase();
-      const white = p === p.toUpperCase();
+      const white = p !== kind;
+      if (kind === 'k') { if (white) wk = i; else bk = i; continue; }
       const r = i >> 3, f = i & 7;
       const cf = 3.5 - Math.abs(f - 3.5), cr = 3.5 - Math.abs(r - 3.5);
       const center = cf + cr; // 0..7
       let v = VAL[kind];
+      if (kind !== 'p') npm += v;
+      mat += white ? v : -v;
       if (kind === 'n' || kind === 'b') v += center * 6;
       else if (kind === 'p') {
         const adv = white ? 6 - r : r - 1; // 0..5
         v += adv * 8 + cf * 3;
       } else if (kind === 'q') v += center * 2;
-      else if (kind === 'k') {
-        const backRank = white ? r === 7 : r === 0;
-        v += backRank ? 15 : -20;
-        if (backRank && (f <= 2 || f >= 6)) v += 15; // tucked-away / castled
-      }
       score += white ? v : -v;
+    }
+    // Middlegame: kings want to hide on the back rank. Endgame: kings belong in the centre.
+    const endgame = npm <= 1800;
+    const kingTerm = (k, white) => {
+      const r = k >> 3, f = k & 7;
+      if (endgame) return (7 - Math.abs(f - 3.5) - Math.abs(r - 3.5)) * 6;
+      const back = white ? r === 7 : r === 0;
+      return (back ? 15 : -20) + (back && (f <= 2 || f >= 6) ? 15 : 0);
+    };
+    if (wk >= 0) score += kingTerm(wk, true);
+    if (bk >= 0) score -= kingTerm(bk, false);
+    // "Mop-up": when clearly winning an endgame, herd the losing king to the edge and walk
+    // our king toward it. Without this a shallow search can't see the mate and just shuffles.
+    if (endgame && wk >= 0 && bk >= 0 && Math.abs(mat) >= 300) {
+      const weak = mat > 0 ? bk : wk, strong = mat > 0 ? wk : bk;
+      const edge = Math.abs((weak & 7) - 3.5) + Math.abs((weak >> 3) - 3.5); // 1 (centre) .. 7 (corner)
+      const dist = Math.abs((weak & 7) - (strong & 7)) + Math.abs((weak >> 3) - (strong >> 3));
+      const mop = edge * 12 + (14 - dist) * 5;
+      score += mat > 0 ? mop : -mop;
     }
     return s.turn === 'w' ? score : -score;
   }
@@ -289,29 +317,52 @@
     return alpha;
   }
 
-  // level 0: sloppy (depth 1 + noise), 1: depth 2, 2: depth 3
-  function bestMove(s, level) {
+  // Plain fixed-depth search from the side to move: { score (centipawns), move }.
+  // Mate scores are MATE - plies, so the UI can turn them into "mate in N".
+  function search(s, depth) {
+    const moves = legalMoves(s);
+    if (!moves.length) return { score: inCheck(s) ? -MATE : 0, move: null };
+    moves.sort((a, c) => orderScore(c) - orderScore(a));
+    let best = moves[0], alpha = -Infinity;
+    for (const m of moves) {
+      const sc = -negamax(apply(s, m), depth - 1, -Infinity, -alpha, 1);
+      if (sc > alpha) { alpha = sc; best = m; }
+    }
+    return { score: alpha, move: best };
+  }
+
+  // level 0: sloppy (depth 1 + big noise), 1: depth 2, 2: depth 3.
+  // seen (optional): Map of key(position) -> times it has occurred in the game. A move that
+  // would make a third repetition scores as a draw (0); a winning bot avoids revisiting.
+  function bestMove(s, level, seen) {
     const moves = legalMoves(s);
     if (!moves.length) return null;
     const depth = [1, 2, 3][level] || 2;
     const noise = [140, 12, 4][level] || 10;
-    let best = null, bestScore = -Infinity;
+    let best = null, bestScore = -Infinity, alpha = -Infinity;
     moves.sort((a, c) => orderScore(c) - orderScore(a));
-    let alpha = -Infinity;
     for (const m of moves) {
-      let sc = -negamax(apply(s, m), depth - 1, -Infinity, -alpha, 1);
-      // noise on every root move: alpha-beta bounds are only exact for the best move,
-      // which is fine — noise just breaks ties / makes weak levels blunder a bit.
+      const ns = apply(s, m);
+      const reps = seen ? seen.get(key(ns)) || 0 : 0;
+      let sc;
+      if (reps >= 2) sc = 0;
+      else {
+        sc = -negamax(ns, depth - 1, -Infinity, -alpha, 1);
+        if (reps === 1 && sc > 0) sc -= 40;
+      }
+      // Noise breaks ties and makes the weak level blunder. Root moves after the first are
+      // searched with a narrowed window (scores below alpha are only bounds), which is fine:
+      // a margin of `noise` keeps near-ties eligible.
       sc += (Math.random() - 0.5) * noise;
       if (sc > bestScore) { bestScore = sc; best = m; }
-      if (level > 0 && sc > alpha) alpha = sc - noise; // keep a margin so noisy near-ties survive
+      if (level > 0 && sc > alpha) alpha = sc - noise;
     }
     return best;
   }
 
   const api = {
     colorOf, other, sqName, fromFEN, initial, isAttacked, findKing,
-    legalMoves, apply, inCheck, status, perft, bestMove, evaluate, VAL,
+    legalMoves, apply, inCheck, status, perft, bestMove, search, evaluate, key, VAL, MATE,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.ChessEngine = api;
