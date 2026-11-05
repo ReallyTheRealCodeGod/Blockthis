@@ -29,7 +29,7 @@
   #floaters span { position: absolute; bottom: -60px; font-size: 32px; opacity: .22; animation: rise linear infinite; }
   @keyframes rise { to { transform: translateY(-115vh) rotate(360deg); } }
 
-  #app { position: relative; z-index: 1; max-width: 640px; margin: 0 auto; padding: 8px 16px 24px; transition: filter .6s; }
+  #app { position: relative; z-index: 1; max-width: 640px; margin: 0 auto; padding: 8px max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px)); transition: filter .6s; }
   #app.shake { animation: shake .4s; }
   #app.big-shake { animation: shake .7s; }
   @keyframes shake {
@@ -129,7 +129,40 @@
   #endcard button { margin-top: 14px; font-size: 20px; font-weight: 900; padding: 12px 22px; border: 0; border-radius: 99px; cursor: pointer;
     background: linear-gradient(90deg, var(--cyan), var(--lime)); color: #000; }
 
+  /* unhinged additions */
+  .pc { animation: wob 2.6s ease-in-out infinite; animation-delay: var(--d, 0s); }
+  @keyframes wob { 0%,100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg) scale(1.04); } }
+  #toolbar { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 10px; }
+  .tb { border: 1px solid rgba(255,255,255,.3); background: rgba(255,255,255,.12); color: #fff; font-weight: 800; font-size: 12px; padding: 7px 11px; border-radius: 99px; cursor: pointer; }
+  .tb.on { background: var(--lime); color: #000; }
+  #hand { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 10px; min-height: 66px; }
+  .card { width: 108px; border: 2px solid var(--yellow); border-radius: 12px; background: linear-gradient(160deg, #3b0a6b, #12002b); color: #fff; padding: 6px;
+    display: flex; flex-direction: column; align-items: center; gap: 1px; cursor: pointer; font-weight: 800; font-size: 11px; font-family: inherit; transition: transform .12s; }
+  .card i { font-style: normal; font-size: 24px; }
+  .card small { font-weight: 600; font-size: 9px; opacity: .85; text-align: center; line-height: 1.1; }
+  .card:disabled { opacity: .4; cursor: not-allowed; }
+  .card:not(:disabled):hover { transform: translateY(-4px) scale(1.05); }
+  .card.fresh { animation: cardin .5s cubic-bezier(.3,1.6,.5,1); }
+  @keyframes cardin { from { transform: translateY(40px) scale(.4) rotate(40deg); opacity: 0; } }
+  .nohand { font-size: 11px; opacity: .75; align-self: center; text-align: center; max-width: 280px; }
+  #npcsay { min-height: 20px; text-align: center; font-size: 13px; font-weight: 800; color: var(--yellow); margin-top: 4px; }
+  #runnerwrap { margin-top: 12px; position: relative; }
+  #runner { width: 100%; height: auto; display: block; border-radius: 10px; border: 2px solid var(--cyan); background: #0a0020; }
+  #runnerwrap span { position: absolute; left: 8px; top: 6px; font-size: 10px; font-weight: 800; opacity: .85; }
+  #sponsor { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: none; gap: 10px; align-items: center; justify-content: space-between;
+    background: var(--yellow); color: #111; font-weight: 900; font-size: 13px; padding: 10px max(16px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+  #sponsor.on { display: flex; animation: msgin .3s; }
+  #sponsor button { border: 2px solid #111; background: #fff; font-weight: 900; border-radius: 6px; padding: 4px 8px; cursor: pointer; }
+  #sponsor button:disabled { opacity: .55; cursor: default; }
+  #app.fire #board { animation: fireglow .7s ease-in-out infinite alternate; }
+  @keyframes fireglow { from { box-shadow: 0 0 18px #ff8a1a, 0 0 50px rgba(255,59,59,.5); } to { box-shadow: 0 0 34px #ffe600, 0 0 90px rgba(255,138,26,.7); } }
+  #app.ultra #boardbox::before { content: ""; position: absolute; inset: -8px; border-radius: 16px; z-index: -1; filter: blur(10px);
+    background: conic-gradient(var(--cyan), var(--pink), var(--yellow), var(--lime), var(--cyan)); animation: spinr 4s linear infinite; }
+  @keyframes spinr { to { transform: rotate(360deg); } }
+  .yeet { position: fixed; z-index: 35; pointer-events: none; font-size: 54px; line-height: 1; }
+
   @media (prefers-reduced-motion: reduce) {
+    .pc, #app.fire #board, #app.ultra #boardbox::before { animation: none; }
     body, h1, #ticker div, #floaters span { animation: none; }
     #app.shake, #app.big-shake { animation: none; }
     #boardbox { transition: none; }
@@ -163,16 +196,24 @@
       <button class="rb" id="unobtn" aria-label="Uno reverse: undo your last turn (once per game)"><b>🔄</b><span>UNO</span></button>
       <button class="rb" id="adhdbtn" aria-label="Attention span timer"><b>⏱️</b><span>ADHD</span></button>
       <button class="rb" id="lvlbtn" aria-label="Opponent difficulty"><b>🤖</b><span id="lvltxt">SIGMA</span></button>
-      <button class="rb" id="skinbtn" aria-label="Change skin"><b>🎨</b><span>SKIN</span></button>
-      <button class="rb" id="mutebtn" aria-label="Toggle sound"><b>🔊</b><span>SFX</span></button>
-      <button class="rb" id="newbtn" aria-label="New game"><b>♻️</b><span>NEW</span></button>
     </div>
     <div id="pops"></div>
   </div>
 
+  <div id="hand" aria-label="Brainrot cards"></div>
+  <div id="toolbar">
+    <button class="tb" id="skinbtn">🎨 SKIN</button>
+    <button class="tb on" id="mutebtn">🔊 SFX</button>
+    <button class="tb on" id="voicebtn">🗣️ VOICE</button>
+    <button class="tb" id="beatbtn">🎵 BEAT</button>
+    <button class="tb" id="newbtn">♻️ NEW</button>
+  </div>
   <div id="status"></div>
+  <div id="npcsay"></div>
   <div id="chat" aria-live="off"></div>
+  <div id="runnerwrap"><canvas id="runner" width="480" height="110" aria-hidden="true"></canvas><span>SPLIT-SCREEN GAMEPLAY (FOR YOUR ATTENTION SPAN)</span></div>
 </div>
+<div id="sponsor"></div>
 
 <div id="end"><div id="endcard">
   <h2 id="endtitle"></h2>
@@ -212,6 +253,7 @@
     win: ['BRO IS COOKED', 'SKIBIDI CHECKMATE', 'GG NO RE', 'W RIZZ', 'GOATED 🐐'],
     lose: ['YOU GOT COOKED', 'CERTIFIED L', 'DOWN HORRENDOUS', 'EMOTIONAL DAMAGE'],
     uno: ['UNO REVERSE 🔄', 'NO U', 'TIME LOOP ACTIVATED'],
+    tax: ['FANUM TAX 🍟', 'THE TAX MAN COMETH', 'YOUR AURA WAS ASSESSED'],
     slow: ['TOO SLOW 💀', 'TIKTOK BRAIN TIMEOUT', 'ATTENTION SPAN: 0'],
   };
   const COLORS = ['#19f0ff', '#ff2bd6', '#b6ff1a', '#ffe600', '#ff8a1a', '#ffffff'];
@@ -224,6 +266,19 @@
     mate: ['GGGGG', 'GOATED', 'CHAT CLIP IT', 'W W W W W', 'history was made'],
     lose: ['rip', 'L', 'respectfully... cooked', 'emotional damage'],
   };
+  const NPC = {
+    cap: ['skill issue', 'ohio rizz activated', 'thanks for the free piece', 'my aura is ten times yours', 'sigma grindset'],
+    check: ['your king is cooked', 'he sees you', 'look at your king. now look at me'],
+    idle: ['mid player detected', 'i am literally just a bot', 'beep boop gyatt', 'calculating your downfall', 'are you even locked in'],
+    hurt: ['NOOOO my pawn', 'that was fanum tax bro', 'i felt that in my cpu', 'bro you are cheating'],
+  };
+  const CARDS = {
+    flush: { icon: '🚽', name: 'FLUSH', desc: 'Deletes a random enemy piece' },
+    glow:  { icon: '💅', name: 'GLOW UP', desc: 'A random pawn becomes a queen' },
+    clown: { icon: '🤡', name: 'CLOWN', desc: 'Their best Q/R/B turns into a horse' },
+    brain: { icon: '🧠', name: 'BIG BRAIN', desc: 'The engine plays your move' },
+  };
+  const SPONSORS = ['SPONSORED: GYATTBURGER™ NOW WITH EXTRA OHIO', 'THIS MOVE BROUGHT TO YOU BY SKIBIDI SOUP™', 'AD: MEWING MOUTHWASH. 0% CLINICALLY PROVEN', 'AD: BUY A CHAIR. SIT ON IT. THAT IS THE LORE'];
   const TICKER = ['BREAKING: LOCAL PAWN GAINS 400 AURA', '🚨 HORSE SPOTTED MOVING IN L-SHAPE 🚨', 'SCIENTISTS CONFIRM THE BISHOP ONLY GOES DIAGONAL (SUSPICIOUS)',
     'YOUR ATTENTION SPAN HAS BEEN ACQUIRED BY TIKTOK', 'QUEEN SLAYS FOR 3RD CONSECUTIVE TURN', 'ROOK STILL STUCK IN CORNER, SOURCES SAY NO CAP',
     'THE KING HAS BEEN LOOKSMAXXING (HE CAN MOVE ONE SQUARE)', 'LIKE + FOLLOW FOR MORE FORCED CHECKMATES', 'PART 2 DROPPING IN THE ENDGAME'];
@@ -243,11 +298,11 @@
     g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
     o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + d + 0.03);
   }
-  function noise(d = 0.2, v = 0.12) {
+  function noise(d = 0.2, v = 0.12, delay = 0) {
     if (muted) return; const a = A(); if (!a) return;
     const n = Math.floor(a.sampleRate * d), buf = a.createBuffer(1, n, a.sampleRate), data = buf.getChannelData(0);
     for (let i = 0; i < n; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / n);
-    const s = a.createBufferSource(), g = a.createGain(); s.buffer = buf; g.gain.value = v; s.connect(g); g.connect(a.destination); s.start();
+    const s = a.createBufferSource(), g = a.createGain(); s.buffer = buf; g.gain.value = v; s.connect(g); g.connect(a.destination); s.start(a.currentTime + delay);
   }
   const PENTA = [523, 587, 659, 784, 880, 1047];
   const sfx = {
@@ -267,7 +322,7 @@
   /* ---------- state ---------- */
   let S, history, selected, legal, lastMove, over, thinking;
   let aura, combo, likes, unoLeft, plyCount, level = 1, adhd = false, skin = 'meme', skinOverride = null;
-  let timerId = null, aiTimer = null, bestAura = 0;
+  let timerId = null, aiTimer = null, bestAura = 0, hand = [], freshCard = -1, rankIdx = 0, voiceOn = true, beatOn = false, sponsorT = null;
   try { bestAura = +localStorage.getItem('brainrot-chess-best') || 0; } catch (e) {}
   try { const sv = localStorage.getItem('brainrot-chess-skin'); if (SKINS[sv]) skin = sv; } catch (e) {}
 
@@ -329,15 +384,24 @@
   /* ---------- aura ---------- */
   function rankFor(a) { let r = RANKS[0][1]; for (const [t, n] of RANKS) if (a >= t) r = n; return r; }
   function setAura(v) {
+    const prev = aura || 0;
     aura = Math.max(0, Math.round(v));
     $('aura').textContent = aura;
     $('aurarank').textContent = rankFor(aura);
     $('aurafill').style.width = Math.min(100, (aura / 3000) * 100) + '%';
     if (aura > bestAura) { bestAura = aura; try { localStorage.setItem('brainrot-chess-best', '' + bestAura); } catch (e) {} }
+    let ri = 0; RANKS.forEach(([t], i) => { if (aura >= t) ri = i; });
+    if (ri > rankIdx && aura > prev) { rankIdx = ri; rankUp(RANKS[ri][1]); } else if (ri < rankIdx) rankIdx = ri;
+    $('app').classList.toggle('ultra', ri === RANKS.length - 1);
+  }
+  function rankUp(name) {
+    sfx.promo(); popup('RANK UP: ' + name, '#ffe600'); speak('Rank up. ' + name); addLikes(200);
+    burst(innerWidth / 2, innerHeight * 0.35, ['🏆', '⬆️', '🔥', '💯'], 16); shake(false);
   }
   function setCombo(n) {
     combo = n; const el = $('combo');
     el.textContent = n >= 2 ? `x${n} 🔥` : '';
+    $('app').classList.toggle('fire', n >= 3);
     if (n >= 2) { el.classList.add('bump'); setTimeout(() => el.classList.remove('bump'), 160); }
   }
 
@@ -371,10 +435,11 @@
       let html = '';
       if (f === 0) html += `<span class="co r">${8 - r}</span>`;
       if (r === 7) html += `<span class="co f">${'abcdefgh'[f]}</span>`;
-      if (p) html += `<span class="pc ${E.colorOf(p)}${lastMove && i === lastMove.t ? ' landed' : ''}">${glyph(p)}</span>`;
+      if (p) html += `<span class="pc ${E.colorOf(p)}${lastMove && i === lastMove.t ? ' landed' : ''}" style="--d:${-((i * 37) % 26) / 10}s">${glyph(p)}</span>`;
       el.innerHTML = html;
     }
     $('unobtn').disabled = !(unoLeft && history.length >= 2 && S.turn === PLAYER && !over && !thinking);
+    renderHand();
   }
   function setStatus(t) { $('status').textContent = t; }
 
@@ -382,7 +447,8 @@
   function newGame() {
     clearTimeout(aiTimer); clearInterval(timerId);
     S = E.initial(); history = []; selected = -1; legal = E.legalMoves(S); lastMove = null; over = false; thinking = false;
-    unoLeft = true; plyCount = 0; likes = 0; skinOverride = null;
+    unoLeft = true; plyCount = 0; likes = 0; skinOverride = null; rankIdx = 0; hand = [rand(['flush', 'glow', 'brain'])]; freshCard = 0;
+    clearInterval(sponsorT); $('sponsor').classList.remove('on'); $('npcsay').textContent = '';
     setAura(0); setCombo(0); addLikes(0);
     $('end').classList.remove('on');
     $('chat').innerHTML = '';
@@ -402,16 +468,20 @@
     render();
   }
 
-  function play(m, who) {
+  function play(m, who) { commit(E.apply(S, m), m, who); }
+  function commit(ns, m, who) {
     clearInterval(timerId); $('timewrap').classList.remove('on');
     history.push({ S, lastMove, aura, combo });
     const mover = S.turn;
-    S = E.apply(S, m); lastMove = m; selected = -1; plyCount++;
+    S = ns; lastMove = m; selected = -1; plyCount++;
     const st = E.status(S);
     const gaveCheck = E.inCheck(S);
     legal = E.legalMoves(S);
     render();
     react(m, who, mover, st, gaveCheck);
+    if (who === 'ai' && plyCount % 8 === 0) grantCard();
+    if (who !== 'ai' && combo === 3) grantCard();
+    if (plyCount % 14 === 7 && st === 'play') showSponsor();
     if (st !== 'play') return finish(st, mover);
     if (S.turn === PLAYER) { setStatus(gaveCheck ? '⚠️ YOU ARE IN CHECK — SAVE THE KING' : 'YOUR TURN — no cap'); startTurnTimer(); }
     else aiTurn();
@@ -453,9 +523,9 @@
     }
 
     if (isCap) {
-      sfx.boom(); shake(val >= 500); buzz(40);
+      sfx.boom(); shake(val >= 500); buzz(40); yeet(m.t, m.cap);
       burstAtSquare(m.t, isMine ? ['💥', '🔥', '✨', '🗿'] : ['💀', '😭', '📉'], val >= 500 ? 20 : 10);
-      popup(rand(isMine ? TEXT.capture : TEXT.lost), isMine ? undefined : '#ff3b3b');
+      { const tx = rand(isMine ? TEXT.capture : TEXT.lost); popup(tx, isMine ? undefined : '#ff3b3b'); speak(tx); }
       if (!isMine) sfx.lost();
       chatSay(isMine ? 'capture' : 'lost', val >= 500 ? 4 : 2);
       addLikes(isMine ? Math.round(val / 4) : 2);
@@ -467,11 +537,179 @@
       chatSay('check', 2); addLikes(40);
     }
     if (!isCap && !m.castle && !m.promo && !gaveCheck && Math.random() < 0.35) chatSay('idle', 1);
+    if (who === 'ai' && st === 'play' && (isCap || gaveCheck || Math.random() < 0.3)) npcSay(rand(isCap ? NPC.cap : gaveCheck ? NPC.check : NPC.idle));
+    else if (isMine && isCap && st === 'play') npcSay(rand(NPC.hurt));
+  }
+
+  function npcSay(t) { $('npcsay').textContent = '🤖 NPC: ' + t; speak(t, true); }
+  function speak(t, bot) {
+    if (!voiceOn || muted) return;
+    try {
+      const ss = window.speechSynthesis; if (!ss) return;
+      const clean = t.replace(/[^\w\s'!?+.-]/g, '').trim(); if (!clean) return;
+      ss.cancel(); const u = new SpeechSynthesisUtterance(clean);
+      u.rate = bot ? 1.2 : 1.35; u.pitch = bot ? 0.5 : 1.8; u.volume = 0.9; ss.speak(u);
+    } catch (e) {}
+  }
+  function yeet(sq, piece) {
+    if (reduceMotion || !piece) return;
+    const sEl = $('board').children[sq]; if (!sEl) return;
+    const r = sEl.getBoundingClientRect(), el = document.createElement('div');
+    el.className = 'yeet'; el.textContent = glyph(piece);
+    el.style.left = (r.left + r.width / 2 - 27) + 'px'; el.style.top = (r.top + r.height / 2 - 27) + 'px'; document.body.appendChild(el);
+    const dx = (Math.random() < 0.5 ? -1 : 1) * (200 + Math.random() * 300), dy = -(250 + Math.random() * 300);
+    el.animate([{ transform: 'translate(0,0) rotate(0) scale(1)', opacity: 1 },
+      { transform: `translate(${dx}px,${dy}px) rotate(${(Math.random() < .5 ? -1 : 1) * 1080}deg) scale(2.6)`, opacity: 0 }],
+      { duration: 1100, easing: 'cubic-bezier(.2,.7,.4,1)' }).onfinish = () => el.remove();
+  }
+  function rain(n) {
+    if (reduceMotion) n = Math.min(n, 8);
+    const em = ['💀', '🗿', '😭', '🔥', '🚽', '🐐', '💅', '🧠', '🍟', '✨'];
+    for (let i = 0; i < n; i++) setTimeout(() => {
+      const el = document.createElement('div'); el.className = 'part'; el.textContent = rand(em); el.style.left = (Math.random() * 100) + 'vw'; el.style.top = '-30px'; el.style.fontSize = (20 + Math.random() * 28) + 'px';
+      document.body.appendChild(el);
+      el.animate([{ transform: 'translateY(0) rotate(0)', opacity: 1 }, { transform: `translateY(${innerHeight + 60}px) rotate(${Math.random() * 720 - 360}deg)`, opacity: 1 }],
+        { duration: 1400 + Math.random() * 1400, easing: 'ease-in' }).onfinish = () => el.remove();
+    }, i * 45);
+  }
+
+  /* ---------- brainrot cards ---------- */
+  const canUseCard = () => !over && !thinking && S.turn === PLAYER && !E.inCheck(S);
+  function renderHand() {
+    const el = $('hand'); el.innerHTML = '';
+    if (!hand.length) { el.innerHTML = '<span class="nohand">NO CARDS. A new one drops every 8 plies, or when you hit a x3 combo.</span>'; return; }
+    const ok = canUseCard();
+    hand.forEach((k, i) => {
+      const c = CARDS[k], b = document.createElement('button');
+      b.type = 'button'; b.className = 'card' + (i === freshCard ? ' fresh' : ''); b.disabled = !ok; b.title = c.desc;
+      b.innerHTML = `<i>${c.icon}</i><span>${c.name}</span><small>${c.desc}</small>`;
+      b.addEventListener('click', () => useCard(i)); el.appendChild(b);
+    });
+    freshCard = -1;
+  }
+  function grantCard() {
+    if (hand.length >= 3) return;
+    hand.push(rand(Object.keys(CARDS))); freshCard = hand.length - 1;
+    popup('NEW CARD 🃏', '#ffe600'); sfx.promo(); speak('New card'); renderHand();
+  }
+  function refuse(msg) { setStatus(msg); sfx.lost(); }
+  function useCard(i) {
+    if (!canUseCard()) return;
+    A(); const kind = hand[i];
+    const b = S.b.slice(), cast = Object.assign({}, S.cast);
+    const clearCorner = (sq) => { if (sq === 63) cast.K = false; if (sq === 56) cast.Q = false; if (sq === 7) cast.k = false; if (sq === 0) cast.q = false; };
+    const idxs = (fn) => b.map((p, k) => (p && fn(p) ? k : -1)).filter((k) => k >= 0);
+    let m;
+    if (kind === 'brain') {
+      hand.splice(i, 1); popup('BIG BRAIN TIME 🧠', '#ff2bd6'); speak('Big brain time'); sfx.combo(5);
+      thinking = true; render(); setStatus('BIG BRAIN IS COOKING 🧠');
+      setTimeout(() => { const bm = E.bestMove(S, 2); thinking = false; if (bm) play(bm, 'you'); else render(); }, 400);
+      return;
+    }
+    if (kind === 'flush') {
+      const c = idxs((p) => E.colorOf(p) === 'b' && p !== 'k'); if (!c.length) return refuse('NOTHING LEFT TO FLUSH');
+      const t = rand(c), cap = b[t]; b[t] = null; clearCorner(t);
+      m = { f: t, t, piece: 'x', cap, promo: null, castle: null }; popup('FLUSHED 🚽', '#19f0ff'); speak('Flushed');
+    } else if (kind === 'glow') {
+      const c = idxs((p) => p === 'P'); if (!c.length) return refuse('NO PAWNS TO GLOW UP');
+      const t = rand(c); b[t] = 'Q'; m = { f: t, t, piece: 'P', cap: null, promo: 'q', castle: null };
+    } else {
+      const c = idxs((p) => 'qrb'.includes(p)); if (!c.length) return refuse('NOTHING TO CLOWN ON');
+      let t = c[0]; for (const k of c) if (E.VAL[b[k]] > E.VAL[b[t]]) t = k;
+      b[t] = 'n'; clearCorner(t); m = { f: t, t, piece: 'x', cap: null, promo: null, castle: null };
+      popup('CLOWNED 🤡', '#ff8a1a'); speak('Clowned'); burstAtSquare(t, ['🤡', '🎈', '🤣'], 16);
+    }
+    hand.splice(i, 1); sfx.uno(); shake(true);
+    commit({ b, turn: 'b', cast, ep: -1 }, m, 'you');
+  }
+
+  /* ---------- sponsor break ---------- */
+  function showSponsor() {
+    const el = $('sponsor'); clearInterval(sponsorT);
+    let n = 4; el.innerHTML = '<span></span><button type="button" id="skipad" disabled></button>';
+    el.firstChild.textContent = rand(SPONSORS);
+    const btn = $('skipad'); btn.textContent = 'SKIP IN ' + n; btn.addEventListener('click', () => { if (!btn.disabled) { el.classList.remove('on'); clearInterval(sponsorT); } });
+    el.classList.add('on'); let life = 0;
+    sponsorT = setInterval(() => {
+      life++; n--;
+      if (n > 0) btn.textContent = 'SKIP IN ' + n; else { btn.disabled = false; btn.textContent = 'SKIP ▶'; }
+      if (life >= 9) { el.classList.remove('on'); clearInterval(sponsorT); }
+    }, 1000);
+  }
+
+  /* ---------- beat ---------- */
+  let beatTimer = null, beatStep = 0, beatNext = 0;
+  const BASS = [55, 0, 55, 0, 65.4, 0, 49, 0, 55, 0, 55, 55, 73.4, 0, 65.4, 0];
+  const bpm = () => 104 + rankIdx * 14 + Math.min(combo, 5) * 4;
+  function schedBeat() {
+    const a = A(); if (!a) return;
+    while (beatNext < a.currentTime + 0.15) {
+      const d = beatNext - a.currentTime, st = beatStep;
+      if (!muted) {
+        if (st % 4 === 0) tone(150, 0.16, 'sine', 0.22, 40, d);
+        if (st % 2 === 1) noise(0.03, 0.05, d);
+        if (BASS[st]) tone(BASS[st] * 2, 0.13, 'square', 0.05, null, d);
+        if (st % 4 === 2) tone(PENTA[(st * 3 + rankIdx) % 6] / 2, 0.1, 'triangle', 0.04, null, d);
+      }
+      beatNext += 60 / bpm() / 4; beatStep = (beatStep + 1) % 16;
+    }
+  }
+  function setBeat(on) {
+    beatOn = on; $('beatbtn').classList.toggle('on', on); clearInterval(beatTimer);
+    if (on) { const a = A(); if (!a) { beatOn = false; $('beatbtn').classList.remove('on'); return; } beatStep = 0; beatNext = a.currentTime + 0.1; beatTimer = setInterval(schedBeat, 40); }
+  }
+
+  /* ---------- split-screen runner ---------- */
+  function startRunner() {
+    const cv = $('runner'), g = cv.getContext('2d'), W = cv.width, H = cv.height, GY = H - 20, px = 70;
+    let y = 0, vy = 0, coins = 0, bgx = 0, spawn = 40, obs = [], cs = [];
+    g.textBaseline = 'alphabetic'; g.textAlign = 'center';
+    function draw() {
+      const sky = g.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#1a0540'); sky.addColorStop(1, '#4b1a8f');
+      g.fillStyle = sky; g.fillRect(0, 0, W, H);
+      g.fillStyle = 'rgba(255,255,255,.08)'; for (let i = -1; i < W / 80 + 1; i++) g.fillRect(i * 80 + bgx, 20, 40, 6);
+      g.fillStyle = '#0d0230'; g.fillRect(0, GY, W, H - GY);
+      g.fillStyle = '#19f0ff'; g.fillRect(0, GY, W, 3);
+      g.font = '34px serif';
+      for (const o of obs) g.fillText(o.e, o.x, GY + 2);
+      for (const c of cs) g.fillText('🪙', c.x, c.y);
+      g.fillText('🏃', px, GY - y + 2);
+      g.font = '800 14px system-ui, sans-serif'; g.textAlign = 'right'; g.fillStyle = '#ffe600'; g.fillText('🪙 ' + coins, W - 10, 20); g.textAlign = 'center';
+    }
+    function frame() {
+      if (!document.hidden) {
+        const sp = 4 + Math.min(4, (aura || 0) / 700);
+        bgx = (bgx - sp * 0.4) % 80;
+        if (--spawn <= 0) {
+          const o = { x: W + 20, e: rand(['🚧', '🚽', '🗿', '🚂', '🌵']) }; obs.push(o);
+          if (Math.random() < 0.6) for (let k = 0; k < 3; k++) cs.push({ x: o.x - 30 + k * 30, y: GY - 62 });
+          spawn = 55 + Math.random() * 70;
+        }
+        for (const o of obs) o.x -= sp; for (const c of cs) c.x -= sp;
+        obs = obs.filter((o) => o.x > -40);
+        cs = cs.filter((c) => { if (Math.abs(c.x - px) < 18 && y > 20) { coins++; return false; } return c.x > -20; });
+        if (y === 0 && obs.some((o) => o.x - px > 0 && o.x - px < sp * 10)) vy = 8.5;
+        y += vy; vy -= 0.65; if (y <= 0) { y = 0; vy = 0; }
+        draw();
+      }
+      requestAnimationFrame(frame);
+    }
+    if (reduceMotion) draw(); else requestAnimationFrame(frame);
+  }
+
+  /* ---------- cursor trail ---------- */
+  let lastTrail = 0;
+  function trail(e) {
+    if (reduceMotion) return;
+    const n = performance.now(); if (n - lastTrail < 70) return; lastTrail = n;
+    const el = document.createElement('div'); el.className = 'part'; el.textContent = rand(['✨', '💀', '🔥', '🗿', '👁️']);
+    el.style.left = e.clientX + 'px'; el.style.top = e.clientY + 'px'; el.style.fontSize = '16px'; document.body.appendChild(el);
+    el.animate([{ transform: 'translate(-50%,-50%) scale(1)', opacity: .9 }, { transform: 'translate(-50%,-120%) scale(.3) rotate(90deg)', opacity: 0 }], { duration: 600 }).onfinish = () => el.remove();
   }
 
   function chaosMaybe() {
     if (over || plyCount % 10 !== 0) return;
-    const roll = rand(['spin', 'hue', 'skin', 'hype']);
+    const roll = rand(['spin', 'hue', 'skin', 'hype', 'rain', 'tax', 'blessing']);
     const app = $('app');
     if (roll === 'spin' && !reduceMotion) {
       popup('BOARD SPIN 🌀', '#19f0ff'); const bb = $('boardbox'); bb.classList.add('spin');
@@ -482,6 +720,12 @@
       popup('EMOJI ROULETTE 🎰', '#ffe600');
       skinOverride = rand(['meme', 'animals', 'food'].filter((s) => s !== skin));
       render(); setTimeout(() => { skinOverride = null; render(); }, 6000);
+    } else if (roll === 'rain') {
+      popup('EMOJI RAIN 🌧️', '#19f0ff'); rain(40); chatSay('idle', 3);
+    } else if (roll === 'tax') {
+      const t = Math.min(aura, 30 + Math.round(aura * 0.1)); setAura(aura - t); const tx = rand(TEXT.tax); popup(tx, '#ff8a1a'); speak(tx); addChat('fanum', 'i am taxing ' + t + ' aura', '#ff8a1a'); burst(innerWidth / 2, innerHeight / 3, ['🍟'], 14);
+    } else if (roll === 'blessing') {
+      setAura(aura + 150); popup('AURA BLESSING +150 ✨', '#b6ff1a'); speak('Aura blessing'); burst(innerWidth / 2, innerHeight / 3, ['✨', '🙏', '😇'], 18);
     } else {
       popup('CHAT GOING WILD 📈', '#ff2bd6'); chatSay('idle', 4); addLikes(150);
     }
@@ -496,7 +740,7 @@
         title = rand(TEXT.win); sub = 'CHECKMATE. THE BOT IS HAVING A BAD DAY.'; setAura(aura + 1000);
         sfx.horn(); shake(true); buzz(200); chatSay('mate', 6); addLikes(1000);
         for (let i = 0; i < 5; i++) setTimeout(() => burst(innerWidth * Math.random(), innerHeight * (0.2 + Math.random() * 0.4), ['🎉', '👑', '🐐', '🔥', '💯'], 14), i * 250);
-        popup('CHECKMATE!!!', '#ffe600');
+        popup('CHECKMATE!!!', '#ffe600'); rain(60); speak('Checkmate! Skibidi!');
       } else {
         title = rand(TEXT.lose); sub = 'CHECKMATE. THE BOT HAS MORE AURA THAN YOU.'; sfx.sad(); chatSay('lose', 4); popup('YOU GOT COOKED 💀', '#ff3b3b');
       }
@@ -556,7 +800,9 @@
     try { localStorage.setItem('brainrot-chess-skin', skin); } catch (e) {}
     render(); setStatus('SKIN: ' + SKINS[skin].name); tone(700, .08, 'triangle', .07);
   });
-  $('mutebtn').addEventListener('click', (e) => { muted = !muted; e.currentTarget.querySelector('b').textContent = muted ? '🔇' : '🔊'; if (!muted) { A(); tone(800, .1, 'triangle', .08); } });
+  $('mutebtn').addEventListener('click', (e) => { muted = !muted; e.currentTarget.textContent = muted ? '🔇 SFX' : '🔊 SFX'; e.currentTarget.classList.toggle('on', !muted); if (!muted) { A(); tone(800, .1, 'triangle', .08); } else { try { window.speechSynthesis && speechSynthesis.cancel(); } catch (x) {} } });
+  $('voicebtn').addEventListener('click', (e) => { A(); voiceOn = !voiceOn; e.currentTarget.classList.toggle('on', voiceOn); if (voiceOn) speak('Voice on, no cap'); else { try { speechSynthesis.cancel(); } catch (x) {} } });
+  $('beatbtn').addEventListener('click', () => { A(); setBeat(!beatOn); setStatus(beatOn ? 'BEAT ON: TEMPO SCALES WITH YOUR AURA 🎵' : 'BEAT OFF'); });
   $('newbtn').addEventListener('click', () => { A(); newGame(); });
   $('again').addEventListener('click', () => { A(); newGame(); });
 
@@ -573,6 +819,8 @@
     setInterval(() => { viewers = Math.max(300, viewers + Math.floor((Math.random() - 0.42) * 90)); $('viewers').textContent = fmt(viewers); }, 1800);
     setInterval(() => { if (!over) addChat(rand(USERS), rand(CHAT.idle)); }, 4500);
     $('lvltxt').textContent = LEVELS[level];
+    addEventListener('pointermove', trail);
+    startRunner();
     newGame();
   }
   init();

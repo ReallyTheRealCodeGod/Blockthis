@@ -15,6 +15,7 @@ You play cyan (white) against a bot. Tap a piece, tap a green dot.
 - **ADHD mode**: 10 seconds per move or the game plays a random one for you
 - **Skins**: meme / animals / food / classic
 - Difficulty: NPC (sloppy) → SIGMA → GIGACHAD (depth-3 search)
+- **Brainrot cards** (FLUSH, GLOW UP, CLOWN, BIG BRAIN), a talking trash-talk bot (speech synthesis), a beat whose tempo scales with rank, a split-screen endless-runner strip, YEET captures, fake sponsor breaks, cursor emoji trail, emoji rain and Fanum tax events
 
 `prefers-reduced-motion` turns off shake/spin/hue effects.
 
