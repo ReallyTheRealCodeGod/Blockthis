@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chess But Brainrot</title>
+<style>
+  :root {
+    --bg1: #12002b; --bg2: #3b0a6b; --bg3: #00334d;
+    --light: #b69cff; --dark: #5b2bb8;
+    --cyan: #19f0ff; --pink: #ff2bd6; --lime: #b6ff1a; --yellow: #ffe600; --red: #ff3b3b;
+    --ink: #fff;
+    --bs: min(calc(100vw - 84px), 58vh, 520px);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: linear-gradient(135deg, var(--bg1), var(--bg2), var(--bg3), var(--bg1));
+    background-size: 400% 400%;
+    animation: bgmove 14s ease-in-out infinite;
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overflow-x: hidden;
+    -webkit-user-select: none; user-select: none;
+  }
+  @keyframes bgmove { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+
+  #floaters { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
+  #floaters span { position: absolute; bottom: -60px; font-size: 32px; opacity: .22; animation: rise linear infinite; }
+  @keyframes rise { to { transform: translateY(-115vh) rotate(360deg); } }
+
+  #app { position: relative; z-index: 1; max-width: 640px; margin: 0 auto; padding: 8px 16px 24px; transition: filter .6s; }
+  #app.shake { animation: shake .4s; }
+  #app.big-shake { animation: shake .7s; }
+  @keyframes shake {
+    0%,100% { transform: translate(0,0) rotate(0); }
+    15% { transform: translate(-7px,4px) rotate(-.6deg); } 30% { transform: translate(6px,-5px) rotate(.6deg); }
+    45% { transform: translate(-5px,-3px) rotate(-.4deg); } 60% { transform: translate(5px,4px) rotate(.4deg); }
+    80% { transform: translate(-2px,2px); }
+  }
+  #app.hue { filter: hue-rotate(140deg) saturate(1.6); }
+
+  /* ticker */
+  #ticker { overflow: hidden; white-space: nowrap; background: var(--yellow); color: #111; font-weight: 900;
+    font-size: 12px; letter-spacing: .5px; border-radius: 6px; padding: 4px 0; margin-bottom: 8px; }
+  #ticker div { display: inline-block; padding-left: 100%; animation: tick 28s linear infinite; }
+  @keyframes tick { to { transform: translateX(-100%); } }
+
+  header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+  h1 { margin: 0; font-family: Impact, "Arial Black", system-ui, sans-serif; font-size: clamp(17px, 5vw, 28px); white-space: nowrap;
+    letter-spacing: 1px; text-transform: uppercase; line-height: 1;
+    background: linear-gradient(90deg, var(--cyan), var(--pink), var(--yellow), var(--cyan)); background-size: 300% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent; animation: slide 4s linear infinite; }
+  @keyframes slide { to { background-position: 300% 0; } }
+  .live { background: var(--red); font-weight: 800; font-size: 12px; padding: 3px 8px; border-radius: 6px; display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+  .live i { width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: blink 1.4s infinite; }
+  @keyframes blink { 50% { opacity: .2; } }
+
+  /* aura */
+  #aurawrap { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: 800; font-size: 13px; }
+  #aurabar { flex: 1; height: 14px; background: rgba(255,255,255,.12); border-radius: 99px; overflow: hidden; border: 1px solid rgba(255,255,255,.25); }
+  #aurafill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--cyan), var(--lime), var(--yellow), var(--pink)); transition: width .5s; }
+  #aurarank { min-width: 112px; text-align: right; color: var(--yellow); }
+  #combo { color: var(--lime); min-width: 70px; font-family: Impact, system-ui; font-size: 18px; transition: transform .15s; }
+  #combo.bump { transform: scale(1.5) rotate(-6deg); }
+
+  #timewrap { height: 6px; background: rgba(255,255,255,.1); border-radius: 99px; overflow: hidden; margin-bottom: 6px; visibility: hidden; }
+  #timewrap.on { visibility: visible; }
+  #timebar { height: 100%; width: 100%; background: var(--lime); }
+
+  /* stage = board + rail */
+  #stage { position: relative; display: flex; gap: 10px; justify-content: center; align-items: flex-start; }
+  #boardbox { position: relative; width: var(--bs); height: var(--bs); transition: transform .9s cubic-bezier(.5,1.6,.4,1); }
+  #boardbox.spin { transform: rotate(360deg); }
+  #board { width: 100%; height: 100%; display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr);
+    border-radius: 10px; overflow: hidden; border: 3px solid var(--pink); box-shadow: 0 0 24px var(--pink), 0 0 60px rgba(25,240,255,.35); }
+  .sq { position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; border: 0; font: inherit; color: inherit; }
+  .sq.l { background: var(--light); } .sq.d { background: var(--dark); }
+  .sq .co { position: absolute; font-size: calc(var(--bs) / 40); font-weight: 800; opacity: .6; pointer-events: none; }
+  .sq .co.r { top: 2px; left: 3px; } .sq .co.f { bottom: 1px; right: 3px; }
+  .sq.last::before { content: ""; position: absolute; inset: 0; background: rgba(255,230,0,.38); }
+  .sq.sel::before { content: ""; position: absolute; inset: 0; background: rgba(182,255,26,.6); }
+  .sq.chk::before { content: ""; position: absolute; inset: 0; background: radial-gradient(circle, rgba(255,59,59,.95), rgba(255,59,59,.15) 75%); animation: blink .8s infinite; }
+  .sq.tgt::after { content: ""; position: absolute; width: 28%; height: 28%; border-radius: 50%; background: var(--lime); box-shadow: 0 0 10px var(--lime); opacity: .9; }
+  .sq.tgt.cap::after { width: 86%; height: 86%; background: transparent; border: 4px solid var(--red); box-shadow: 0 0 10px var(--red); }
+  .pc { position: relative; z-index: 2; width: 84%; height: 84%; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: calc(var(--bs) / 8 * .58); line-height: 1; pointer-events: none; }
+  .pc.w { background: radial-gradient(circle, rgba(25,240,255,.5), rgba(25,240,255,.08) 70%); box-shadow: 0 0 0 2px var(--cyan), 0 0 12px var(--cyan); }
+  .pc.b { background: radial-gradient(circle, rgba(255,43,214,.5), rgba(255,43,214,.08) 70%); box-shadow: 0 0 0 2px var(--pink), 0 0 12px var(--pink); }
+  .pc.landed { animation: land .45s cubic-bezier(.3,1.8,.5,1); }
+  @keyframes land { 0% { transform: scale(1.8) rotate(-18deg); } 100% { transform: scale(1) rotate(0); } }
+  .skin-classic .pc { font-size: calc(var(--bs) / 8 * .66); }
+  .skin-classic .pc.w { color: #fff; text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 3px #000; }
+  .skin-classic .pc.b { color: #111; text-shadow: 0 0 3px #fff, 0 0 3px #fff; }
+
+  /* rail (tiktok-style buttons) */
+  #rail { display: flex; flex-direction: column; gap: 10px; align-items: center; width: 56px; }
+  .rb { width: 52px; border: 0; background: none; color: #fff; display: flex; flex-direction: column; align-items: center; gap: 2px;
+    font-size: 10px; font-weight: 800; cursor: pointer; padding: 0; text-shadow: 0 1px 4px #000; }
+  .rb b { width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px;
+    background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.3); transition: transform .12s; }
+  .rb:active b { transform: scale(.82); }
+  .rb.on b { background: var(--lime); color: #000; }
+  .rb:disabled { opacity: .35; cursor: not-allowed; }
+  #heartbtn b { background: rgba(255,43,100,.35); }
+
+  /* popup */
+  #pops { position: absolute; inset: 0; pointer-events: none; z-index: 20; overflow: visible; }
+  .pop { position: absolute; left: 50%; top: 42%; transform: translate(-50%,-50%); width: max-content; max-width: 92vw; text-align: center; line-height: 1.05; font-family: Impact, "Arial Black", system-ui, sans-serif;
+    font-size: clamp(28px, 9vw, 54px); text-transform: uppercase; letter-spacing: 1px; -webkit-text-stroke: 3px #000; paint-order: stroke fill;
+    text-shadow: 4px 4px 0 #000; }
+  .gain { position: absolute; font-weight: 900; font-size: 20px; color: var(--lime); text-shadow: 0 2px 4px #000; z-index: 20; pointer-events: none; }
+  .part { position: fixed; z-index: 30; pointer-events: none; font-size: 24px; }
+
+  /* chat */
+  #chat { margin-top: 12px; height: 132px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; gap: 3px;
+    -webkit-mask-image: linear-gradient(transparent, #000 40%); mask-image: linear-gradient(transparent, #000 40%); }
+  .msg { background: rgba(0,0,0,.35); border-radius: 12px; padding: 3px 10px; font-size: 13px; width: fit-content; max-width: 100%; animation: msgin .25s ease-out; }
+  .msg b { margin-right: 6px; }
+  @keyframes msgin { from { transform: translateY(14px); opacity: 0; } }
+  #status { text-align: center; margin-top: 8px; font-weight: 800; min-height: 22px; font-size: 15px; }
+
+  /* end overlay */
+  #end { position: fixed; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center; background: rgba(10,0,25,.82); padding: 20px; }
+  #end.on { display: flex; }
+  #endcard { text-align: center; max-width: 420px; padding: 24px; border-radius: 18px; border: 3px solid var(--yellow); background: #1a0540; box-shadow: 0 0 40px var(--pink); animation: msgin .4s; }
+  #endcard h2 { font-family: Impact, "Arial Black", system-ui, sans-serif; font-size: 44px; margin: 0 0 6px; text-transform: uppercase; color: var(--yellow); line-height: 1.05; }
+  #endcard p { margin: 6px 0; font-weight: 700; }
+  #endcard button { margin-top: 14px; font-size: 20px; font-weight: 900; padding: 12px 22px; border: 0; border-radius: 99px; cursor: pointer;
+    background: linear-gradient(90deg, var(--cyan), var(--lime)); color: #000; }
+
+  @media (prefers-reduced-motion: reduce) {
+    body, h1, #ticker div, #floaters span { animation: none; }
+    #app.shake, #app.big-shake { animation: none; }
+    #boardbox { transition: none; }
+    #app.hue { filter: none; }
+  }
+</style>
+</head>
+<body>
+<div id="floaters" aria-hidden="true"></div>
+
+<div id="app">
+  <div id="ticker"><div id="tickertxt"></div></div>
+
+  <header>
+    <h1>Chess but Brainrot 💀</h1>
+    <div class="live"><i></i>LIVE <span id="viewers">1.2K</span></div>
+  </header>
+
+  <div id="aurawrap">
+    <span>AURA <span id="aura">0</span></span>
+    <div id="aurabar"><div id="aurafill"></div></div>
+    <span id="aurarank">NPC</span>
+    <span id="combo"></span>
+  </div>
+  <div id="timewrap"><div id="timebar"></div></div>
+
+  <div id="stage">
+    <div id="boardbox"><div id="board" role="grid" aria-label="Chess board"></div></div>
+    <div id="rail">
+      <button class="rb" id="heartbtn" aria-label="Like"><b>❤️</b><span id="likes">0</span></button>
+      <button class="rb" id="unobtn" aria-label="Uno reverse: undo your last turn (once per game)"><b>🔄</b><span>UNO</span></button>
+      <button class="rb" id="adhdbtn" aria-label="Attention span timer"><b>⏱️</b><span>ADHD</span></button>
+      <button class="rb" id="lvlbtn" aria-label="Opponent difficulty"><b>🤖</b><span id="lvltxt">SIGMA</span></button>
+      <button class="rb" id="skinbtn" aria-label="Change skin"><b>🎨</b><span>SKIN</span></button>
+      <button class="rb" id="mutebtn" aria-label="Toggle sound"><b>🔊</b><span>SFX</span></button>
+      <button class="rb" id="newbtn" aria-label="New game"><b>♻️</b><span>NEW</span></button>
+    </div>
+    <div id="pops"></div>
+  </div>
+
+  <div id="status"></div>
+  <div id="chat" aria-live="off"></div>
+</div>
+
+<div id="end"><div id="endcard">
+  <h2 id="endtitle"></h2>
+  <p id="endsub"></p>
+  <p id="endscore"></p>
+  <button id="again">RUN IT BACK 🔁</button>
+</div></div>
+
+<script src="engine.js"></script>
+<script>
+(() => {
+  'use strict';
+  const E = window.ChessEngine;
+  const $ = (id) => document.getElementById(id);
+  const rand = (a) => a[Math.floor(Math.random() * a.length)];
+  const PLAYER = 'w';
+  const ADHD_MS = 10000;
+  const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- content ---------- */
+  const SKINS = {
+    meme:    { name: 'MEME',    p: '🗿', n: '🐴', b: '🧙', r: '🏰', q: '💅', k: '👑' },
+    animals: { name: 'ANIMALS', p: '🐜', n: '🦄', b: '🦉', r: '🐘', q: '🐝', k: '🦁' },
+    food:    { name: 'FOOD',    p: '🍟', n: '🌭', b: '🥖', r: '🍔', q: '🍕', k: '🍩' },
+    classic: { name: 'CLASSIC', p: '♟', n: '♞', b: '♝', r: '♜', q: '♛', k: '♚' },
+  };
+  const SKIN_ORDER = ['meme', 'animals', 'food', 'classic'];
+  const LEVELS = ['NPC', 'SIGMA', 'GIGACHAD'];
+  const RANKS = [[0, 'NPC'], [150, 'NORMIE'], [400, 'MID'], [800, 'SIGMA'], [1500, 'GIGACHAD'], [3000, 'ULTRA INSTINCT']];
+
+  const TEXT = {
+    capture: ['SHEEEESH', 'GYATT 😳', 'NAH ID TAKE', 'COOKED 🍳', 'DELETED 🗑️', 'OHIO MOMENT', 'MEWING ACTIVATED 😶', 'SKIBIDI SNATCH', 'ABSOLUTE CINEMA'],
+    check: ['CHECK?? NO CAP', 'RIZZ ATTACK 😏', 'KING IS SHAKING', 'FANUM TAX ON THE KING', 'HE SEES YOU 👁️'],
+    castle: ['KING FLED TO THE BACKROOMS', 'SIDE QUEST: CASTLE', 'HIDING IN THE LORE'],
+    promo: ['GLOW UP 💅', 'LEVEL 100 BOSS', 'MAIN CHARACTER ENERGY', 'NPC → PLAYER'],
+    lost: ['L + RATIO', 'AURA −500', 'NPC BEHAVIOR', 'BRO FELL OFF', 'TAKE THE L 📉', 'THAT WAS MID'],
+    win: ['BRO IS COOKED', 'SKIBIDI CHECKMATE', 'GG NO RE', 'W RIZZ', 'GOATED 🐐'],
+    lose: ['YOU GOT COOKED', 'CERTIFIED L', 'DOWN HORRENDOUS', 'EMOTIONAL DAMAGE'],
+    uno: ['UNO REVERSE 🔄', 'NO U', 'TIME LOOP ACTIVATED'],
+    slow: ['TOO SLOW 💀', 'TIKTOK BRAIN TIMEOUT', 'ATTENTION SPAN: 0'],
+  };
+  const COLORS = ['#19f0ff', '#ff2bd6', '#b6ff1a', '#ffe600', '#ff8a1a', '#ffffff'];
+  const USERS = ['skibidi_dad', 'xX_rizzler_Xx', 'gyatt_goblin', 'sigma_sam', 'ohio_final_boss', 'mewing_mike', 'npc_energy', 'babygronk', 'toilet_enjoyer', 'aura_farmer', 'lowtaperfade', 'chair_connoisseur', 'brainrot_andy', 'pawn_stan'];
+  const CHAT = {
+    idle: ['chat is this real', 'first', 'he is NOT blinking', 'no way', 'the board is giving ohio', 'bro is locked in', 'pls do the horse thing', 'my attention span left', 'say less', 'W stream', 'this is peak', 'did he just lag', 'POV: you are the pawn', 'the lore is deep rn', 'who is winning', 'i fear the horse 🐴'],
+    capture: ['SHEEEESH', 'GYATT', 'DELETED 💀', 'he cooked FR', 'NAH THAT WAS CLEAN', 'ratio', 'W move', 'AURA +9999', 'pawn is crying rn'],
+    check: ['KING SHAKING', 'cooked cooked cooked', 'not the king 😭', 'CHECK CHECK CHECK', 'he is panicking'],
+    lost: ['L', 'bro got ratioed by a bot', 'NPC moment', 'fell off', 'bot has more aura', 'take the L 😭', 'oof'],
+    mate: ['GGGGG', 'GOATED', 'CHAT CLIP IT', 'W W W W W', 'history was made'],
+    lose: ['rip', 'L', 'respectfully... cooked', 'emotional damage'],
+  };
+  const TICKER = ['BREAKING: LOCAL PAWN GAINS 400 AURA', '🚨 HORSE SPOTTED MOVING IN L-SHAPE 🚨', 'SCIENTISTS CONFIRM THE BISHOP ONLY GOES DIAGONAL (SUSPICIOUS)',
+    'YOUR ATTENTION SPAN HAS BEEN ACQUIRED BY TIKTOK', 'QUEEN SLAYS FOR 3RD CONSECUTIVE TURN', 'ROOK STILL STUCK IN CORNER, SOURCES SAY NO CAP',
+    'THE KING HAS BEEN LOOKSMAXXING (HE CAN MOVE ONE SQUARE)', 'LIKE + FOLLOW FOR MORE FORCED CHECKMATES', 'PART 2 DROPPING IN THE ENDGAME'];
+
+  /* ---------- sound ---------- */
+  let actx = null, muted = false;
+  function A() {
+    if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+    if (actx && actx.state === 'suspended') actx.resume();
+    return actx;
+  }
+  function tone(f, d = 0.12, type = 'square', v = 0.05, slide = null, delay = 0) {
+    if (muted) return; const a = A(); if (!a) return;
+    const t = a.currentTime + delay, o = a.createOscillator(), g = a.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t);
+    if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + d);
+    g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + d + 0.03);
+  }
+  function noise(d = 0.2, v = 0.12) {
+    if (muted) return; const a = A(); if (!a) return;
+    const n = Math.floor(a.sampleRate * d), buf = a.createBuffer(1, n, a.sampleRate), data = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const s = a.createBufferSource(), g = a.createGain(); s.buffer = buf; g.gain.value = v; s.connect(g); g.connect(a.destination); s.start();
+  }
+  const PENTA = [523, 587, 659, 784, 880, 1047];
+  const sfx = {
+    move: (sq) => tone(PENTA[(sq & 7) % 6], 0.1, 'triangle', 0.09),
+    boom: () => { tone(170, 0.55, 'sine', 0.5, 32); noise(0.18, 0.18); },
+    check: () => { tone(880, 0.12, 'square', 0.05); tone(660, 0.12, 'square', 0.05, null, 0.13); tone(880, 0.12, 'square', 0.05, null, 0.26); },
+    combo: (n) => { for (let i = 0; i < Math.min(n + 1, 6); i++) tone(PENTA[i], 0.09, 'square', 0.05, null, i * 0.06); },
+    promo: () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.12, 'triangle', 0.1, null, i * 0.07)),
+    horn: () => { [466, 554, 698].forEach((f) => tone(f, 0.9, 'sawtooth', 0.045, f * 0.97)); sfx.boom(); },
+    sad: () => [392, 370, 349, 330].forEach((f, i) => tone(f, 0.38, 'sawtooth', 0.06, f * 0.94, i * 0.32)),
+    lost: () => tone(300, 0.25, 'sawtooth', 0.05, 90),
+    uno: () => { tone(200, 0.3, 'square', 0.06, 800); tone(800, 0.3, 'square', 0.06, 200, 0.3); },
+    tick: () => tone(1200, 0.04, 'square', 0.03),
+  };
+  const buzz = (ms) => { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} };
+
+  /* ---------- state ---------- */
+  let S, history, selected, legal, lastMove, over, thinking;
+  let aura, combo, likes, unoLeft, plyCount, level = 1, adhd = false, skin = 'meme', skinOverride = null;
+  let timerId = null, aiTimer = null, bestAura = 0;
+  try { bestAura = +localStorage.getItem('brainrot-chess-best') || 0; } catch (e) {}
+  try { const sv = localStorage.getItem('brainrot-chess-skin'); if (SKINS[sv]) skin = sv; } catch (e) {}
+
+  /* ---------- dom helpers ---------- */
+  function popup(text, color) {
+    const el = document.createElement('div');
+    el.className = 'pop'; el.textContent = text; el.style.color = color || rand(COLORS);
+    $('pops').appendChild(el);
+    const rot = (Math.random() * 14 - 7);
+    const frames = [
+      { transform: `translate(-50%,-50%) scale(.2) rotate(${rot * 3}deg)`, opacity: 0 },
+      { transform: `translate(-50%,-50%) scale(1.25) rotate(${rot}deg)`, opacity: 1, offset: .18 },
+      { transform: `translate(-50%,-50%) scale(1) rotate(${rot}deg)`, opacity: 1, offset: .7 },
+      { transform: `translate(-50%,-80%) scale(.9) rotate(${rot}deg)`, opacity: 0 },
+    ];
+    const a = el.animate(frames, { duration: reduceMotion ? 900 : 1300, easing: 'ease-out' });
+    a.onfinish = () => el.remove();
+  }
+  function gainText(sqIdx, txt) {
+    const sqEl = $('board').children[sqIdx]; if (!sqEl) return;
+    const sr = sqEl.getBoundingClientRect(), pr = $('stage').getBoundingClientRect();
+    const el = document.createElement('div'); el.className = 'gain'; el.textContent = txt;
+    el.style.left = (sr.left - pr.left) + 'px'; el.style.top = (sr.top - pr.top) + 'px';
+    $('stage').appendChild(el);
+    el.animate([{ transform: 'translateY(0) scale(.6)', opacity: 0 }, { transform: 'translateY(-14px) scale(1.2)', opacity: 1, offset: .2 }, { transform: 'translateY(-60px) scale(1)', opacity: 0 }], { duration: 1100, easing: 'ease-out' }).onfinish = () => el.remove();
+  }
+  function burst(x, y, emojis, n = 12) {
+    if (reduceMotion) n = Math.min(n, 4);
+    for (let i = 0; i < n; i++) {
+      const el = document.createElement('div'); el.className = 'part'; el.textContent = rand(emojis);
+      el.style.left = x + 'px'; el.style.top = y + 'px'; document.body.appendChild(el);
+      const ang = Math.random() * Math.PI * 2, dist = 60 + Math.random() * 120;
+      el.animate([{ transform: 'translate(-50%,-50%) scale(.4)', opacity: 1 },
+        { transform: `translate(calc(-50% + ${Math.cos(ang) * dist}px), calc(-50% + ${Math.sin(ang) * dist + 60}px)) scale(1.2) rotate(${Math.random() * 360}deg)`, opacity: 0 }],
+        { duration: 700 + Math.random() * 500, easing: 'cubic-bezier(.2,.8,.4,1)' }).onfinish = () => el.remove();
+    }
+  }
+  function burstAtSquare(i, emojis, n) {
+    const el = $('board').children[i]; if (!el) return;
+    const r = el.getBoundingClientRect(); burst(r.left + r.width / 2, r.top + r.height / 2, emojis, n);
+  }
+  function shake(big) {
+    if (reduceMotion) return;
+    const app = $('app'); const c = big ? 'big-shake' : 'shake';
+    app.classList.remove('shake', 'big-shake'); void app.offsetWidth; app.classList.add(c);
+    setTimeout(() => app.classList.remove(c), big ? 750 : 450);
+  }
+  function addChat(user, text, color) {
+    const chat = $('chat'), m = document.createElement('div'); m.className = 'msg';
+    const b = document.createElement('b'); b.textContent = user; b.style.color = color || rand(COLORS);
+    m.appendChild(b); m.appendChild(document.createTextNode(text)); chat.appendChild(m);
+    while (chat.children.length > 7) chat.removeChild(chat.firstChild);
+  }
+  const chatSay = (kind, n = 1) => { for (let i = 0; i < n; i++) setTimeout(() => addChat(rand(USERS), rand(CHAT[kind])), i * 180 + Math.random() * 200); };
+  function addLikes(n) { likes += n; $('likes').textContent = fmt(likes); }
+  const fmt = (n) => (n >= 1000 ? (n / 1000).toFixed(1) + 'K' : '' + n);
+  function heartBurst(x, y, n = 6) { burst(x, y, ['❤️', '💖', '🔥', '💀', '😭', '🗿'], n); }
+
+  /* ---------- aura ---------- */
+  function rankFor(a) { let r = RANKS[0][1]; for (const [t, n] of RANKS) if (a >= t) r = n; return r; }
+  function setAura(v) {
+    aura = Math.max(0, Math.round(v));
+    $('aura').textContent = aura;
+    $('aurarank').textContent = rankFor(aura);
+    $('aurafill').style.width = Math.min(100, (aura / 3000) * 100) + '%';
+    if (aura > bestAura) { bestAura = aura; try { localStorage.setItem('brainrot-chess-best', '' + bestAura); } catch (e) {} }
+  }
+  function setCombo(n) {
+    combo = n; const el = $('combo');
+    el.textContent = n >= 2 ? `x${n} 🔥` : '';
+    if (n >= 2) { el.classList.add('bump'); setTimeout(() => el.classList.remove('bump'), 160); }
+  }
+
+  /* ---------- rendering ---------- */
+  function glyph(p) {
+    const sk = skinOverride || skin;
+    return SKINS[sk][p.toLowerCase()];
+  }
+  function render() {
+    const board = $('board');
+    board.className = 'skin-' + (skinOverride || skin);
+    if (board.children.length !== 64) {
+      board.innerHTML = '';
+      for (let i = 0; i < 64; i++) {
+        const sq = document.createElement('button');
+        sq.type = 'button'; sq.dataset.i = i;
+        board.appendChild(sq);
+      }
+    }
+    const checkSq = E.inCheck(S) ? E.findKing(S.b, S.turn) : -1;
+    const targets = new Map(legal.filter((m) => m.f === selected).map((m) => [m.t, m]));
+    for (let i = 0; i < 64; i++) {
+      const el = board.children[i], p = S.b[i], r = i >> 3, f = i & 7;
+      let cls = 'sq ' + ((r + f) % 2 === 0 ? 'l' : 'd');
+      if (lastMove && (i === lastMove.f || i === lastMove.t)) cls += ' last';
+      if (i === selected) cls += ' sel';
+      if (i === checkSq) cls += ' chk';
+      if (targets.has(i)) cls += ' tgt' + (targets.get(i).cap ? ' cap' : '');
+      el.className = cls;
+      el.setAttribute('aria-label', E.sqName(i) + (p ? ' ' + (E.colorOf(p) === 'w' ? 'white ' : 'black ') + ({ p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' })[p.toLowerCase()] : ' empty'));
+      let html = '';
+      if (f === 0) html += `<span class="co r">${8 - r}</span>`;
+      if (r === 7) html += `<span class="co f">${'abcdefgh'[f]}</span>`;
+      if (p) html += `<span class="pc ${E.colorOf(p)}${lastMove && i === lastMove.t ? ' landed' : ''}">${glyph(p)}</span>`;
+      el.innerHTML = html;
+    }
+    $('unobtn').disabled = !(unoLeft && history.length >= 2 && S.turn === PLAYER && !over && !thinking);
+  }
+  function setStatus(t) { $('status').textContent = t; }
+
+  /* ---------- game flow ---------- */
+  function newGame() {
+    clearTimeout(aiTimer); clearInterval(timerId);
+    S = E.initial(); history = []; selected = -1; legal = E.legalMoves(S); lastMove = null; over = false; thinking = false;
+    unoLeft = true; plyCount = 0; likes = 0; skinOverride = null;
+    setAura(0); setCombo(0); addLikes(0);
+    $('end').classList.remove('on');
+    $('chat').innerHTML = '';
+    chatSay('idle', 2);
+    render(); setStatus('YOUR TURN — you are the cyan team 🩵'); startTurnTimer();
+  }
+
+  function onSquare(i) {
+    if (over || thinking || S.turn !== PLAYER) return;
+    A(); // unlock audio on first gesture
+    const p = S.b[i];
+    if (selected >= 0) {
+      const m = legal.find((x) => x.f === selected && x.t === i && (!x.promo || x.promo === 'q'));
+      if (m) { play(m, 'you'); return; }
+    }
+    if (p && E.colorOf(p) === PLAYER) { selected = i; sfx.tick(); } else selected = -1;
+    render();
+  }
+
+  function play(m, who) {
+    clearInterval(timerId); $('timewrap').classList.remove('on');
+    history.push({ S, lastMove, aura, combo });
+    const mover = S.turn;
+    S = E.apply(S, m); lastMove = m; selected = -1; plyCount++;
+    const st = E.status(S);
+    const gaveCheck = E.inCheck(S);
+    legal = E.legalMoves(S);
+    render();
+    react(m, who, mover, st, gaveCheck);
+    if (st !== 'play') return finish(st, mover);
+    if (S.turn === PLAYER) { setStatus(gaveCheck ? '⚠️ YOU ARE IN CHECK — SAVE THE KING' : 'YOUR TURN — no cap'); startTurnTimer(); }
+    else aiTurn();
+    chaosMaybe();
+  }
+
+  function aiTurn() {
+    thinking = true; render();
+    setStatus('NPC IS COOKING 🍳🍳🍳');
+    aiTimer = setTimeout(() => {
+      const m = E.bestMove(S, level);
+      thinking = false;
+      if (m) play(m, 'ai');
+    }, 500 + Math.random() * 400);
+  }
+
+  /* ---------- the brainrot ---------- */
+  function react(m, who, mover, st, gaveCheck) {
+    const isCap = !!m.cap, isMine = who !== 'ai', val = isCap ? E.VAL[m.cap.toLowerCase()] : 0;
+    const sqEl = $('board').children[m.t].getBoundingClientRect();
+    const cx = sqEl.left + sqEl.width / 2, cy = sqEl.top + sqEl.height / 2;
+    sfx.move(m.t);
+
+    if (isMine) {
+      // combo: consecutive turns where you capture or give check
+      if (isCap || gaveCheck) setCombo(combo + 1); else setCombo(0);
+      const mult = Math.max(1, combo);
+      let pts = 3;
+      if (isCap) pts += (val / 10) * mult;
+      if (gaveCheck) pts += 25 * mult;
+      if (m.castle) pts += 40;
+      if (m.promo) pts += 100;
+      setAura(aura + pts);
+      gainText(m.t, `+${Math.round(pts)} AURA`);
+      if (combo >= 2) { sfx.combo(combo); popup(`COMBO x${combo}!!`, '#b6ff1a'); }
+    } else {
+      setCombo(0);
+      if (isCap) { setAura(aura - val / 8); gainText(m.t, `−${Math.round(val / 8)} AURA`); }
+    }
+
+    if (isCap) {
+      sfx.boom(); shake(val >= 500); buzz(40);
+      burstAtSquare(m.t, isMine ? ['💥', '🔥', '✨', '🗿'] : ['💀', '😭', '📉'], val >= 500 ? 20 : 10);
+      popup(rand(isMine ? TEXT.capture : TEXT.lost), isMine ? undefined : '#ff3b3b');
+      if (!isMine) sfx.lost();
+      chatSay(isMine ? 'capture' : 'lost', val >= 500 ? 4 : 2);
+      addLikes(isMine ? Math.round(val / 4) : 2);
+    }
+    if (m.castle) { popup(rand(TEXT.castle), '#ffe600'); chatSay('idle', 1); }
+    if (m.promo) { sfx.promo(); shake(false); burstAtSquare(m.t, ['👑', '💅', '✨', '💖'], 24); popup(rand(TEXT.promo), '#ff2bd6'); addLikes(300); }
+    if (gaveCheck && st === 'play') {
+      sfx.check(); setTimeout(() => popup(rand(TEXT.check), '#ff3b3b'), isCap ? 500 : 0);
+      chatSay('check', 2); addLikes(40);
+    }
+    if (!isCap && !m.castle && !m.promo && !gaveCheck && Math.random() < 0.35) chatSay('idle', 1);
+  }
+
+  function chaosMaybe() {
+    if (over || plyCount % 10 !== 0) return;
+    const roll = rand(['spin', 'hue', 'skin', 'hype']);
+    const app = $('app');
+    if (roll === 'spin' && !reduceMotion) {
+      popup('BOARD SPIN 🌀', '#19f0ff'); const bb = $('boardbox'); bb.classList.add('spin');
+      setTimeout(() => { bb.style.transition = 'none'; bb.classList.remove('spin'); void bb.offsetWidth; bb.style.transition = ''; }, 1000);
+    } else if (roll === 'hue' && !reduceMotion) {
+      popup('VIBE SHIFT 🌈', '#b6ff1a'); app.classList.add('hue'); setTimeout(() => app.classList.remove('hue'), 4000);
+    } else if (roll === 'skin') {
+      popup('EMOJI ROULETTE 🎰', '#ffe600');
+      skinOverride = rand(['meme', 'animals', 'food'].filter((s) => s !== skin));
+      render(); setTimeout(() => { skinOverride = null; render(); }, 6000);
+    } else {
+      popup('CHAT GOING WILD 📈', '#ff2bd6'); chatSay('idle', 4); addLikes(150);
+    }
+    sfx.combo(4);
+  }
+
+  function finish(st, mover) {
+    over = true; clearInterval(timerId); $('timewrap').classList.remove('on'); render();
+    let title, sub;
+    if (st === 'checkmate') {
+      if (mover === PLAYER) {
+        title = rand(TEXT.win); sub = 'CHECKMATE. THE BOT IS HAVING A BAD DAY.'; setAura(aura + 1000);
+        sfx.horn(); shake(true); buzz(200); chatSay('mate', 6); addLikes(1000);
+        for (let i = 0; i < 5; i++) setTimeout(() => burst(innerWidth * Math.random(), innerHeight * (0.2 + Math.random() * 0.4), ['🎉', '👑', '🐐', '🔥', '💯'], 14), i * 250);
+        popup('CHECKMATE!!!', '#ffe600');
+      } else {
+        title = rand(TEXT.lose); sub = 'CHECKMATE. THE BOT HAS MORE AURA THAN YOU.'; sfx.sad(); chatSay('lose', 4); popup('YOU GOT COOKED 💀', '#ff3b3b');
+      }
+    } else {
+      title = 'DRAW?? 😐'; sub = st === 'stalemate' ? 'STALEMATE. NOBODY ATE. BORING.' : 'NOT ENOUGH PIECES. THE LORE ENDS HERE.'; sfx.sad(); chatSay('lose', 2);
+    }
+    setStatus(title);
+    setTimeout(() => {
+      $('endtitle').textContent = title; $('endsub').textContent = sub;
+      $('endscore').textContent = `AURA: ${aura} (${rankFor(aura)}) · BEST: ${bestAura}`;
+      $('end').classList.add('on');
+    }, 1700);
+  }
+
+  /* ---------- attention-span timer ---------- */
+  function startTurnTimer() {
+    clearInterval(timerId);
+    const wrap = $('timewrap'), bar = $('timebar');
+    if (!adhd || over || S.turn !== PLAYER) { wrap.classList.remove('on'); return; }
+    wrap.classList.add('on');
+    const end = Date.now() + ADHD_MS;
+    timerId = setInterval(() => {
+      const left = end - Date.now(), pct = Math.max(0, left / ADHD_MS);
+      bar.style.width = (pct * 100) + '%'; bar.style.background = pct < 0.3 ? '#ff3b3b' : pct < 0.6 ? '#ffe600' : '#b6ff1a';
+      if (left <= 0) {
+        clearInterval(timerId);
+        if (over || thinking || S.turn !== PLAYER) return;
+        const ms = legal.filter((m) => !m.promo || m.promo === 'q');
+        popup(rand(TEXT.slow), '#ff3b3b'); chatSay('lost', 2); setAura(aura - 15);
+        if (ms.length) play(rand(ms), 'timeout');
+      }
+    }, 100);
+  }
+
+  /* ---------- buttons ---------- */
+  $('board').addEventListener('click', (e) => { const t = e.target.closest('.sq'); if (t) onSquare(+t.dataset.i); });
+  $('heartbtn').addEventListener('click', (e) => {
+    A(); addLikes(1 + Math.floor(Math.random() * 4));
+    const r = e.currentTarget.getBoundingClientRect(); heartBurst(r.left + r.width / 2, r.top + r.height / 2, 5);
+    tone(900 + Math.random() * 300, 0.07, 'triangle', 0.08);
+  });
+  $('unobtn').addEventListener('click', () => {
+    if ($('unobtn').disabled) return;
+    const h = history[history.length - 2]; history.length -= 2;
+    S = h.S; lastMove = h.lastMove; setAura(h.aura - 20); setCombo(h.combo); selected = -1; legal = E.legalMoves(S); unoLeft = false;
+    sfx.uno(); popup(rand(TEXT.uno), '#ff2bd6'); shake(false); chatSay('idle', 2);
+    render(); setStatus('TIME LOOP USED. NO MORE UNO THIS GAME.'); startTurnTimer();
+  });
+  $('adhdbtn').addEventListener('click', (e) => {
+    A(); adhd = !adhd; e.currentTarget.classList.toggle('on', adhd);
+    setStatus(adhd ? 'ADHD MODE: 10s PER MOVE OR WE PLAY FOR YOU 💀' : 'ADHD MODE OFF. TOUCH GRASS.');
+    startTurnTimer();
+  });
+  $('lvlbtn').addEventListener('click', () => { A(); level = (level + 1) % 3; $('lvltxt').textContent = LEVELS[level]; setStatus('OPPONENT: ' + LEVELS[level]); tone(500 + level * 200, .1, 'square', .05); });
+  $('skinbtn').addEventListener('click', () => {
+    A(); skin = SKIN_ORDER[(SKIN_ORDER.indexOf(skin) + 1) % SKIN_ORDER.length]; skinOverride = null;
+    try { localStorage.setItem('brainrot-chess-skin', skin); } catch (e) {}
+    render(); setStatus('SKIN: ' + SKINS[skin].name); tone(700, .08, 'triangle', .07);
+  });
+  $('mutebtn').addEventListener('click', (e) => { muted = !muted; e.currentTarget.querySelector('b').textContent = muted ? '🔇' : '🔊'; if (!muted) { A(); tone(800, .1, 'triangle', .08); } });
+  $('newbtn').addEventListener('click', () => { A(); newGame(); });
+  $('again').addEventListener('click', () => { A(); newGame(); });
+
+  /* ---------- ambient brainrot ---------- */
+  function init() {
+    const fl = $('floaters'), icons = ['💀', '🗿', '😭', '🔥', '👁️', '🚽', '🐐', '💅', '🧠', '🍟', '😳', '✨'];
+    for (let i = 0; i < 14; i++) {
+      const s = document.createElement('span'); s.textContent = icons[i % icons.length];
+      s.style.left = (Math.random() * 100) + '%'; s.style.animationDuration = (12 + Math.random() * 16) + 's'; s.style.animationDelay = (-Math.random() * 20) + 's';
+      s.style.fontSize = (22 + Math.random() * 30) + 'px'; fl.appendChild(s);
+    }
+    $('tickertxt').textContent = TICKER.join('   ✦   ') + '   ✦   ';
+    let viewers = 1200 + Math.floor(Math.random() * 600);
+    setInterval(() => { viewers = Math.max(300, viewers + Math.floor((Math.random() - 0.42) * 90)); $('viewers').textContent = fmt(viewers); }, 1800);
+    setInterval(() => { if (!over) addChat(rand(USERS), rand(CHAT.idle)); }, 4500);
+    $('lvltxt').textContent = LEVELS[level];
+    newGame();
+  }
+  init();
+})();
+</script>
+</body>
+</html>
