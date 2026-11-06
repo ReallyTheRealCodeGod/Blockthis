@@ -15,9 +15,12 @@ Promotions open a picker; underpromoting earns bonus aura.
 - **Chaos events** every 10 plies: board spin, vibe shift, emoji roulette, chat surge
 - **UNO** reverse: undo your last turn (once per game)
 - **ADHD mode**: 10 seconds per move or the game plays a random one for you
-- **Skins**: meme / animals / food / classic
+- **Skins**: Italian brainrot (default: Tralalero Tralala, Bombardiro Crocodilo, Tung Tung Tung Sahur…; captures announce the victim by name) / meme / animals / food / classic, with a legend under the board
+- **Graveyard**: what each side has eaten, material lead, and obituaries in chat (F)
+- **Bot mood** next to the eval bar; when you're clearly winning it begs for a draw once (accept = cringe, decline = +100 aura)
+- **OHIO mode** 🌽: chaos events and card drops every 4 plies, tilting board, faster beat
 - Difficulty: NPC (sloppy) → SIGMA (depth 2) → GIGACHAD (depth 3, 4 in bare endgames)
-- **Brainrot cards** (FLUSH, GLOW UP, CLOWN, BIG BRAIN), a talking trash-talk bot (speech synthesis), a beat whose tempo scales with rank, a split-screen endless-runner strip, YEET captures, fake sponsor breaks, cursor emoji trail, emoji rain and Fanum tax events
+- **Brainrot cards** (FLUSH, GLOW UP, CLOWN, BIG BRAIN, NUKE (atomic blast), RIZZ (steal a piece), SKIP (bot loses a turn); you start with two; every card is checked so it can't leave your king attacked), a talking trash-talk bot (speech synthesis), a beat whose tempo scales with rank, a split-screen endless-runner strip, YEET captures, fake sponsor breaks, cursor emoji trail, emoji rain, Fanum tax, DVD-logo corner hunt and gravity-glitch events
 
 `prefers-reduced-motion` turns off shake/spin/hue effects.
 

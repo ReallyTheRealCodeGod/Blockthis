@@ -149,6 +149,26 @@
   .po:hover, .po:focus-visible { background: rgba(25,240,255,.35); transform: scale(1.06); outline: none; }
   #promocancel { margin-top: 10px; background: none; border: 0; color: #fff; opacity: .85; font-weight: 800; text-decoration: underline; cursor: pointer; }
 
+  #grave { display: flex; justify-content: space-between; gap: 10px; margin-top: 8px; font-size: 12px; font-weight: 800; min-height: 18px; }
+  #grave span { min-width: 0; overflow-wrap: anywhere; }
+  #grave b { color: var(--lime); }
+  #legend { text-align: center; font-size: 11px; opacity: .75; margin-top: 3px; }
+  #offer { position: absolute; inset: 0; z-index: 26; display: flex; align-items: center; justify-content: center; padding: 12px;
+    background: rgba(10,0,25,.82); border-radius: 10px; text-align: center; }
+  #offer[hidden] { display: none; }
+  #offer p { margin: 0 0 12px; font-family: Impact, "Arial Black", system-ui, sans-serif; font-size: 22px; line-height: 1.1; color: var(--yellow); text-transform: uppercase; }
+  .offerbtns { display: flex; flex-direction: column; gap: 8px; }
+  .offerbtns button { font: inherit; font-weight: 900; font-size: 15px; padding: 10px 16px; border-radius: 99px; border: 2px solid #fff; color: #000; cursor: pointer; }
+  #offerno { background: var(--lime); }
+  #offeryes { background: var(--light); }
+  #npcmood { display: inline-block; }
+  #app.ohio #board { animation: ohiotilt 4s ease-in-out infinite; }
+  #app.ohio.fire #board { animation: fireglow .7s ease-in-out infinite alternate, ohiotilt 4s ease-in-out infinite; }
+  @keyframes ohiotilt { 0%,100% { rotate: -2deg; } 50% { rotate: 2deg; } }
+  .dvd { position: fixed; z-index: 45; left: 0; top: 0; pointer-events: none; padding: 8px 14px; border-radius: 50% / 40%; color: #000;
+    font: 900 18px/1 Impact, "Arial Black", system-ui, sans-serif; letter-spacing: 1px; }
+  .flash { position: fixed; inset: 0; z-index: 55; background: #fff; pointer-events: none; }
+
   /* unhinged additions */
   .pc { animation: wob 2.6s ease-in-out infinite; animation-delay: var(--d, 0s); }
   @keyframes wob { 0%,100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg) scale(1.04); } }
@@ -183,6 +203,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     .pc, #app.fire #board, #app.ultra #boardbox::before { animation: none; }
+    #app.ohio #board, #app.ohio.fire #board { animation: none; }
     body, h1, #ticker div, #floaters span { animation: none; }
     #app.shake, #app.big-shake { animation: none; }
     #boardbox { transition: none; }
@@ -211,22 +232,26 @@
   <div id="evalwrap" title="Who is winning, according to the engine">
     <span>🩵 YOU</span>
     <div id="evalbar"><div id="evalfill"></div><div id="evaltxt"></div></div>
-    <span>NPC 🤖</span>
+    <span id="npcmood">NPC 🤖</span>
   </div>
 
   <div id="stage">
     <div id="boardbox"><div id="board" role="grid" aria-label="Chess board"></div>
       <div id="promo" hidden role="dialog" aria-label="Choose a promotion piece"><div id="promobox"><p>GLOW UP INTO…</p><div id="promoopts"></div><button type="button" id="promocancel">nvm</button></div></div>
+      <div id="offer" hidden role="dialog" aria-label="The bot is offering a draw"><div><p>🤖 NPC: pls can we draw 🥺👉👈</p><div class="offerbtns"><button type="button" id="offerno">❌ DECLINE (based)</button><button type="button" id="offeryes">🤝 ACCEPT (cringe)</button></div></div></div>
     </div>
     <div id="rail">
       <button class="rb" id="heartbtn" aria-label="Like"><b>❤️</b><span id="likes">0</span></button>
       <button class="rb" id="unobtn" aria-label="Uno reverse: undo your last turn (once per game)"><b>🔄</b><span>UNO</span></button>
       <button class="rb" id="adhdbtn" aria-label="Attention span timer"><b>⏱️</b><span>ADHD</span></button>
       <button class="rb" id="lvlbtn" aria-label="Opponent difficulty"><b>🤖</b><span id="lvltxt">SIGMA</span></button>
+      <button class="rb" id="ohiobtn" aria-label="Ohio mode: maximum chaos"><b>🌽</b><span>OHIO</span></button>
     </div>
     <div id="pops"></div>
   </div>
 
+  <div id="grave"></div>
+  <div id="legend"></div>
   <div id="hand" aria-label="Brainrot cards"></div>
   <div id="toolbar">
     <button class="tb" id="skinbtn">🎨 SKIN</button>
@@ -262,12 +287,16 @@
 
   /* ---------- content ---------- */
   const SKINS = {
+    italian: { name: 'ITALIAN BRAINROT', p: '🪵', n: '🐒', b: '☕', r: '🐊', q: '🩰', k: '🦈' },
     meme:    { name: 'MEME',    p: '🗿', n: '🐴', b: '🧙', r: '🏰', q: '💅', k: '👑' },
     animals: { name: 'ANIMALS', p: '🐜', n: '🦄', b: '🦉', r: '🐘', q: '🐝', k: '🦁' },
     food:    { name: 'FOOD',    p: '🍟', n: '🌭', b: '🥖', r: '🍔', q: '🍕', k: '🍩' },
     classic: { name: 'CLASSIC', p: '♟', n: '♞', b: '♝', r: '♜', q: '♛', k: '♚' },
   };
-  const SKIN_ORDER = ['meme', 'animals', 'food', 'classic'];
+  const SKIN_ORDER = ['italian', 'meme', 'animals', 'food', 'classic'];
+  const ITALIAN = { p: 'TUNG TUNG TUNG SAHUR', n: 'CHIMPANZINI BANANINI', b: 'CAPPUCCINO ASSASSINO', r: 'BOMBARDIRO CROCODILO', q: 'BALLERINA CAPPUCCINA', k: 'TRALALERO TRALALA' };
+  const PNAME = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
+  const NAMES = ['Kevin', 'Steve', 'Brayden', 'Jaxon', 'Gary', 'Chad', 'Tyler', 'Bartholomew', 'Nugget', 'Gerald', 'Timmy', 'Greg', 'Doug', 'Chungus'];
   const LEVELS = ['NPC', 'SIGMA', 'GIGACHAD'];
   const RANKS = [[0, 'NPC'], [150, 'NORMIE'], [400, 'MID'], [800, 'SIGMA'], [1500, 'GIGACHAD'], [3000, 'ULTRA INSTINCT']];
 
@@ -283,11 +312,12 @@
     tax: ['FANUM TAX 🍟', 'THE TAX MAN COMETH', 'YOUR AURA WAS ASSESSED'],
     slow: ['TOO SLOW 💀', 'TIKTOK BRAIN TIMEOUT', 'ATTENTION SPAN: 0'],
     under: ['UNDERPROMOTION?? 🤯', 'HORSE ARC 🐴', 'BIG BRAIN OR BIG BLUNDER?'],
+    itdeath: ['ELIMINATED', 'HAS LEFT THE CHAT', 'SENT TO THE SHADOW REALM', 'IS NO MORE', 'GOT DELETED'],
   };
   const COLORS = ['#19f0ff', '#ff2bd6', '#b6ff1a', '#ffe600', '#ff8a1a', '#ffffff'];
   const USERS = ['skibidi_dad', 'xX_rizzler_Xx', 'gyatt_goblin', 'sigma_sam', 'ohio_final_boss', 'mewing_mike', 'npc_energy', 'babygronk', 'toilet_enjoyer', 'aura_farmer', 'lowtaperfade', 'chair_connoisseur', 'brainrot_andy', 'pawn_stan'];
   const CHAT = {
-    idle: ['chat is this real', 'first', 'he is NOT blinking', 'no way', 'the board is giving ohio', 'bro is locked in', 'pls do the horse thing', 'my attention span left', 'say less', 'W stream', 'this is peak', 'did he just lag', 'POV: you are the pawn', 'the lore is deep rn', 'who is winning', 'i fear the horse 🐴'],
+    idle: ['chat is this real', 'first', 'he is NOT blinking', 'no way', 'the board is giving ohio', 'bro is locked in', 'pls do the horse thing', 'my attention span left', 'say less', 'W stream', 'this is peak', 'did he just lag', 'POV: you are the pawn', 'the lore is deep rn', 'who is winning', 'i fear the horse 🐴', 'tralalero tralala', 'tung tung tung sahur 🪵', 'bombardiro crocodilo 💣🐊', 'ballerina cappuccina 🩰', 'chat is this italian'],
     capture: ['SHEEEESH', 'GYATT', 'DELETED 💀', 'he cooked FR', 'NAH THAT WAS CLEAN', 'ratio', 'W move', 'AURA +9999', 'pawn is crying rn'],
     check: ['KING SHAKING', 'cooked cooked cooked', 'not the king 😭', 'CHECK CHECK CHECK', 'he is panicking'],
     lost: ['L', 'bro got ratioed by a bot', 'NPC moment', 'fell off', 'bot has more aura', 'take the L 😭', 'oof'],
@@ -303,17 +333,22 @@
     hurt: ['NOOOO my pawn', 'that was fanum tax bro', 'i felt that in my cpu', 'bro you are cheating'],
     oops: ['wait no', 'that was a test', 'my cpu sneezed', 'i meant to do that'],
     gift: ['thank you for the free elo', 'appreciate the gift', 'bro is playing for me'],
+    rage: ['fine. i will remember this', 'you will regret this', 'ok now i am tilted', 'reported'],
+    skipped: ['bro skipped me 😭', 'that is literally illegal', 'i had a move planned 😤'],
   };
   const CARDS = {
     flush: { icon: '🚽', name: 'FLUSH', desc: 'Deletes a random enemy piece' },
     glow:  { icon: '💅', name: 'GLOW UP', desc: 'A random pawn becomes a queen' },
     clown: { icon: '🤡', name: 'CLOWN', desc: 'Their best Q/R/B turns into a horse' },
     brain: { icon: '🧠', name: 'BIG BRAIN', desc: 'The engine plays your move' },
+    nuke:  { icon: '💣', name: 'NUKE', desc: 'Blows up an enemy piece + non-pawns next to it. Yours too' },
+    rizz:  { icon: '😏', name: 'RIZZ', desc: 'Steals a random enemy pawn, knight or bishop' },
+    skip:  { icon: '⏭️', name: 'SKIP', desc: 'After your next move, the bot loses its turn' },
   };
   const SPONSORS = ['SPONSORED: GYATTBURGER™ NOW WITH EXTRA OHIO', 'THIS MOVE BROUGHT TO YOU BY SKIBIDI SOUP™', 'AD: MEWING MOUTHWASH. 0% CLINICALLY PROVEN', 'AD: BUY A CHAIR. SIT ON IT. THAT IS THE LORE'];
   const TICKER = ['BREAKING: LOCAL PAWN GAINS 400 AURA', '🚨 HORSE SPOTTED MOVING IN L-SHAPE 🚨', 'SCIENTISTS CONFIRM THE BISHOP ONLY GOES DIAGONAL (SUSPICIOUS)',
     'YOUR ATTENTION SPAN HAS BEEN ACQUIRED BY TIKTOK', 'QUEEN SLAYS FOR 3RD CONSECUTIVE TURN', 'ROOK STILL STUCK IN CORNER, SOURCES SAY NO CAP',
-    'THE KING HAS BEEN LOOKSMAXXING (HE CAN MOVE ONE SQUARE)', 'LIKE + FOLLOW FOR MORE FORCED CHECKMATES', 'PART 2 DROPPING IN THE ENDGAME'];
+    'THE KING HAS BEEN LOOKSMAXXING (HE CAN MOVE ONE SQUARE)', 'TRALALERO TRALALA SPOTTED ON E4', 'BOMBARDIRO CROCODILO DENIES INVOLVEMENT IN NUKE', 'LIKE + FOLLOW FOR MORE FORCED CHECKMATES', 'PART 2 DROPPING IN THE ENDGAME'];
 
   /* ---------- sound ---------- */
   let actx = null, muted = false;
@@ -389,12 +424,13 @@
 
   /* ---------- state ---------- */
   let S, history, selected, legal, lastMove, over, thinking;
-  let aura, combo, likes, unoLeft, plyCount, level = 1, adhd = false, skin = 'meme', skinOverride = null;
+  let aura, combo, likes, unoLeft, plyCount, level = 1, adhd = false, skin = 'italian', skinOverride = null;
   let timerId = null, aiTimer = null, bestAura = 0, hand = [], freshCard = -1, rankIdx = 0, voiceOn = true, beatOn = false, sponsorT = null;
   let endTimer = null, sqKeys = [], handKey = '', nextPopAt = 0;
   let gen = 0, evalP = null, press = null, dragRect = null, promoOpen = false, ghost = null, hov = -1;
+  let skipArmed = false, begged = false, offerOpen = false, mood = '', ohio = false, graveKey = '', legendKey = '';
   try { bestAura = +localStorage.getItem('brainrot-chess-best') || 0; } catch (e) {}
-  try { const sv = localStorage.getItem('brainrot-chess-skin'); if (SKINS[sv]) skin = sv; } catch (e) {}
+  try { const sv = localStorage.getItem('brainrot-chess-skin-v2'); if (SKINS[sv]) skin = sv; } catch (e) {}
 
   /* ---------- dom helpers ---------- */
   // Popups queue up (~0.45s apart) and stack in different rows, so a capture + check + combo
@@ -484,9 +520,24 @@
   }
 
   /* ---------- rendering ---------- */
-  function glyph(p) {
-    const sk = skinOverride || skin;
-    return SKINS[sk][p.toLowerCase()];
+  const curSkin = () => skinOverride || skin;
+  function glyph(p) { return SKINS[curSkin()][p.toLowerCase()]; }
+  // Captured pieces (derived from what's missing on the board, so cards and UNO stay in sync),
+  // material lead, and a legend for whichever emoji skin is on.
+  function renderGrave() {
+    const init = { p: 8, n: 2, b: 2, r: 2, q: 1 }, cnt = { w: {}, b: {} };
+    let mat = 0;
+    for (const p of S.b) {
+      if (!p || p.toLowerCase() === 'k') continue;
+      const c = E.colorOf(p), k = p.toLowerCase();
+      cnt[c][k] = (cnt[c][k] || 0) + 1; mat += (c === 'w' ? 1 : -1) * E.VAL[k];
+    }
+    const lost = (c) => 'qrbnp'.split('').map((k) => glyph(k).repeat(Math.max(0, init[k] - (cnt[c][k] || 0)))).join('');
+    const adv = Math.round(mat / 100), ate = lost('b'), gone = lost('w');
+    const html = `<span>🍽️ YOU ATE: ${ate || '—'}${adv > 0 ? ` <b>+${adv}</b>` : ''}</span><span>🪦 BOT ATE: ${gone || '—'}${adv < 0 ? ` <b>+${-adv}</b>` : ''}</span>`;
+    if (html !== graveKey) { graveKey = html; $('grave').innerHTML = html; }
+    const lg = 'kqrbnp'.split('').map((k) => glyph(k) + ' ' + PNAME[k]).join(' · ');
+    if (lg !== legendKey) { legendKey = lg; $('legend').textContent = lg; }
   }
   function render() {
     const board = $('board');
@@ -523,7 +574,8 @@
         el.innerHTML = html;
       }
     }
-    $('unobtn').disabled = !(unoLeft && history.length >= 2 && S.turn === PLAYER && !over && !thinking && !promoOpen);
+    $('unobtn').disabled = !(unoLeft && history.length >= 2 && S.turn === PLAYER && !over && !thinking && !promoOpen && !offerOpen);
+    renderGrave();
     renderHand();
   }
   function setStatus(t) { $('status').textContent = t; }
@@ -533,7 +585,7 @@
     clearTimeout(aiTimer); clearInterval(timerId); clearTimeout(endTimer);
     gen++; closePromo(); cancelDrag();
     S = E.initial(); history = []; selected = -1; legal = E.legalMoves(S); lastMove = null; over = false; thinking = false;
-    unoLeft = true; plyCount = 0; likes = 0; skinOverride = null; rankIdx = 0; hand = [rand(['flush', 'glow', 'brain'])]; freshCard = 0;
+    unoLeft = true; plyCount = 0; likes = 0; skinOverride = null; rankIdx = 0; hand = dealStart(); freshCard = 0; skipArmed = false; begged = false; closeOffer(); mood = '';
     clearInterval(sponsorT); $('sponsor').classList.remove('on'); $('npcsay').textContent = '';
     setAura(0); setCombo(0); addLikes(0);
     $('end').classList.remove('on');
@@ -543,7 +595,7 @@
   }
 
   /* ---------- input: tap-tap, drag-and-drop, keyboard ---------- */
-  const canAct = () => !over && !thinking && S.turn === PLAYER && !promoOpen;
+  const canAct = () => !over && !thinking && S.turn === PLAYER && !promoOpen && !offerOpen;
   // Plays from->to if legal, opening the promotion picker when there's a choice to make.
   function tryMoveTo(from, to) {
     const ms = legal.filter((x) => x.f === from && x.t === to);
@@ -665,11 +717,11 @@
     const myP = evalP = requestEval(st);
     Promise.all([beforeP, myP]).then(([b, a]) => {
       if (g !== gen) return; // game reset or UNO'd while the engine was thinking
-      if (evalP === myP) showEval(a);
+      if (evalP === myP) { showEval(a); maybeBeg(a); }
       if (st === 'play' && b) judge(m, who, b, a, choices);
     });
     react(m, who, mover, st, gaveCheck);
-    if (who === 'ai' && plyCount % 8 === 0) grantCard();
+    if (who === 'ai' && plyCount % (ohio ? 4 : 8) === 0) grantCard();
     if (who !== 'ai' && combo === 3) grantCard();
     if (plyCount % 14 === 7 && st === 'play') showSponsor();
     if (st !== 'play') return finish(st, mover);
@@ -740,6 +792,22 @@
     else { pct = ev.mate ? (ev.mate > 0 ? 96 : 4) : 50 + 46 * Math.tanh(ev.cp / 500); label = evalLabel(ev.cp, ev.mate); }
     $('evalfill').style.width = pct + '%';
     $('evaltxt').textContent = label;
+    setMood(ev);
+  }
+  // The bot's face reacts to the eval; it tilts when you're crushing it.
+  function setMood(ev) {
+    let m;
+    if (ev.st === 'checkmate') m = ev.cp > 0 ? '💀' : '😎';
+    else if (ev.st !== 'play') m = '😐';
+    else {
+      const cp = ev.mate ? (ev.mate > 0 ? 9999 : -9999) : ev.cp;
+      m = cp <= -400 ? '😎' : cp <= -120 ? '😏' : cp < 120 ? '🤨' : cp < 400 ? '😰' : cp < 900 ? '😭' : '🤬';
+    }
+    if (m === mood) return;
+    const prev = mood; mood = m;
+    const el = $('npcmood'); el.textContent = 'NPC ' + m;
+    if (!reduceMotion) el.animate([{ transform: 'scale(1.9)' }, { transform: 'none' }], { duration: 450, easing: 'cubic-bezier(.3,1.6,.5,1)' });
+    if (m === '🤬' && prev !== '🤬' && ev.st === 'play') { popup('BOT IS TILTED 🤬', '#ff3b3b'); chatSay('botL', 2); }
   }
   function refreshEval() {
     const g = gen, p = evalP = requestEval('play');
@@ -762,6 +830,11 @@
   }
 
   function aiTurn() {
+    if (skipArmed) {
+      skipArmed = false;
+      if (!E.inCheck(S)) return skipBotTurn();
+      popup('SKIP BLOCKED: BOT IS IN CHECK', '#ff8a1a');
+    }
     thinking = true; render();
     setStatus('NPC IS COOKING 🍳🍳🍳');
     const g = gen, t0 = performance.now(), wait = 500 + Math.random() * 400;
@@ -799,7 +872,9 @@
     if (isCap) {
       sfx.boom(); shake(val >= 500); buzz(40); yeet(capSq, m.cap);
       burstAtSquare(m.t, isMine ? ['💥', '🔥', '✨', '🗿'] : ['💀', '😭', '📉'], val >= 500 ? 20 : 10);
-      { const tx = rand(isMine ? TEXT.capture : TEXT.lost); popup(tx, isMine ? undefined : '#ff3b3b'); speak(tx); }
+      if (curSkin() === 'italian') { const nm = ITALIAN[m.cap.toLowerCase()]; popup(nm + ' ' + rand(TEXT.itdeath), isMine ? '#b6ff1a' : '#ff3b3b'); speak(nm); }
+      else { const tx = rand(isMine ? TEXT.capture : TEXT.lost); popup(tx, isMine ? undefined : '#ff3b3b'); speak(tx); }
+      if (val >= 300 || Math.random() < 0.5) obituary(m.cap);
       if (!isMine) sfx.lost();
       chatSay(isMine ? 'capture' : 'lost', val >= 500 ? 4 : 2);
       addLikes(isMine ? Math.round(val / 4) : 2);
@@ -849,7 +924,83 @@
   }
 
   /* ---------- brainrot cards ---------- */
-  const canUseCard = () => !over && !thinking && !promoOpen && S.turn === PLAYER && !E.inCheck(S);
+  function obituary(piece) {
+    const k = piece.toLowerCase();
+    const who = curSkin() === 'italian' ? ITALIAN[k] : `${rand(NAMES)} the ${PNAME[k]}`;
+    addChat('obituary_bot', `RIP ${who} ${glyph(k)} 🕊️ gone too soon`, '#ffffff');
+    const n = 2 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < n; i++) setTimeout(() => addChat(rand(USERS), rand(['F', 'F', 'o7', 'F in chat', '🕊️'])), 300 + i * 220);
+  }
+  const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  function dealStart() { const ks = shuffle(Object.keys(CARDS)); return [ks[0], ks[1]]; }
+  function flash() {
+    if (reduceMotion) return;
+    const el = document.createElement('div'); el.className = 'flash'; document.body.appendChild(el);
+    el.animate([{ opacity: 0.85 }, { opacity: 0 }], { duration: 450, easing: 'ease-out' }).onfinish = () => el.remove();
+  }
+
+  // SKIP: a "null move" for the bot. Only when it isn't in check (passing out of check is illegal).
+  function skipBotTurn() {
+    history.push({ S, key: E.key(S), lastMove, aura, combo, plyCount, hand: hand.slice() });
+    S = Object.assign({}, S, { turn: PLAYER, ep: -1, half: (S.half || 0) + 1 });
+    plyCount++; selected = -1;
+    let st = E.status(S);
+    if (st === 'play' && repetitions() >= 3) st = 'repetition';
+    legal = E.legalMoves(S);
+    render(); refreshEval();
+    popup('BOT GOT SKIPPED ⏭️💀', '#19f0ff'); speak('Skipped'); sfx.uno(); chatSay('botL', 2);
+    setTimeout(() => npcSay(rand(NPC.skipped)), 400);
+    if (st !== 'play') return finish(st, 'b');
+    setStatus('YOUR TURN AGAIN — the bot got skipped ⏭️'); startTurnTimer();
+  }
+
+  // Draw offer: once per game, when you're clearly winning, the bot begs.
+  function maybeBeg(ev) {
+    if (begged || over || ev.st !== 'play' || S.turn !== PLAYER || thinking || promoOpen) return;
+    if (!(ev.mate > 0 || ev.cp >= 500)) return;
+    begged = true; offerOpen = true; cancelDrag(); selected = -1; render();
+    $('offer').hidden = false; $('offerno').focus();
+    sfx.sad(); speak('please can we draw', true); chatSay('botL', 2);
+  }
+  function closeOffer() { offerOpen = false; $('offer').hidden = true; }
+
+  /* ---------- chaos visuals ---------- */
+  function dvd() {
+    chatSay('idle', 1); addChat(rand(USERS), 'chat it is gonna hit the corner');
+    if (reduceMotion) return;
+    const el = document.createElement('div'); el.className = 'dvd'; el.textContent = 'DVD 📀'; el.style.background = rand(COLORS);
+    document.body.appendChild(el);
+    const w = el.offsetWidth, h = el.offsetHeight, t0 = performance.now();
+    let x = Math.random() * (innerWidth - w), y = Math.random() * (innerHeight - h);
+    let vx = (Math.random() < 0.5 ? -1 : 1) * 2.6, vy = (Math.random() < 0.5 ? -1 : 1) * 2.2, lastX = -1e9, lastY = -2e9, hit = false; // distinct sentinels: no fake corner on frame 1
+    function step(now) {
+      if (now - t0 > 14000) { el.remove(); return; }
+      x += vx; y += vy;
+      if (x <= 0 || x >= innerWidth - w) { vx = -vx; x = Math.max(0, Math.min(innerWidth - w, x)); lastX = now; el.style.background = rand(COLORS); }
+      if (y <= 0 || y >= innerHeight - h) { vy = -vy; y = Math.max(0, Math.min(innerHeight - h, y)); lastY = now; el.style.background = rand(COLORS); }
+      if (!hit && Math.abs(lastX - lastY) < 120) { // both walls within a few frames = a corner
+        hit = true; popup('IT HIT THE CORNER!!! 📀', '#ffe600'); setAura(aura + 300); rain(40); chatSay('mate', 4); sfx.horn(); speak('it hit the corner');
+      }
+      el.style.transform = `translate(${x}px, ${y}px)`;
+      requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  function gravity() {
+    if (reduceMotion) return;
+    const sqs = $('board').children, cell = sqs[0].getBoundingClientRect().height;
+    for (let i = 0; i < 64; i++) {
+      const pc = sqs[i].querySelector('.pc'); if (!pc) continue;
+      const dy = (7 - (i >> 3)) * cell;
+      pc.animate([{ transform: 'none', easing: 'cubic-bezier(.5,0,1,1)' }, { transform: `translateY(${dy}px)`, offset: 0.3 },
+        { transform: `translateY(${dy - 14}px)`, offset: 0.4 }, { transform: `translateY(${dy}px)`, offset: 0.5 },
+        { transform: `translateY(${dy}px)`, offset: 0.75, easing: 'cubic-bezier(.3,1.5,.6,1)' }, { transform: 'none' }],
+        { duration: 2400, delay: Math.random() * 150 });
+    }
+    sfx.boom();
+  }
+
+  const canUseCard = () => !over && !thinking && !promoOpen && !offerOpen && S.turn === PLAYER && !E.inCheck(S);
   function renderHand() {
     const el = $('hand'), ok = canUseCard(), hk = hand.join(',') + '|' + ok;
     if (hk === handKey && freshCard < 0) return; // unchanged: don't rebuild on every tap
@@ -886,18 +1037,62 @@
       });
       return;
     }
+    if (kind === 'skip') {
+      hand.splice(i, 1); skipArmed = true; handKey = '';
+      popup('SKIP ARMED ⏭️', '#19f0ff'); speak('Skip armed'); sfx.combo(3); render();
+      setStatus('MAKE YOUR MOVE. THE BOT IS GETTING SKIPPED ⏭️');
+      return;
+    }
+    // Cards edit the board directly, so every candidate is checked: the result must not leave
+    // your king attacked with the bot to move (impossible in real chess, and the bot could then
+    // "capture" your king).
+    const safe = (nb) => { const k = nb.indexOf('K'); return k >= 0 && !E.isAttacked(nb, k, 'b'); };
     if (kind === 'flush') {
-      const c = idxs((p) => E.colorOf(p) === 'b' && p !== 'k'); if (!c.length) return refuse('NOTHING LEFT TO FLUSH');
-      const t = rand(c), cap = b[t]; b[t] = null; clearCorner(t);
+      const t = shuffle(idxs((p) => E.colorOf(p) === 'b' && p !== 'k')).find((q) => { const nb = b.slice(); nb[q] = null; return safe(nb); });
+      if (t === undefined) return refuse('NOTHING SAFE TO FLUSH');
+      const cap = b[t]; b[t] = null; clearCorner(t);
       m = { f: t, t, piece: 'x', cap, promo: null, castle: null }; popup('FLUSHED 🚽', '#19f0ff'); speak('Flushed');
     } else if (kind === 'glow') {
       const c = idxs((p) => p === 'P'); if (!c.length) return refuse('NO PAWNS TO GLOW UP');
       const t = rand(c); b[t] = 'Q'; m = { f: t, t, piece: 'P', cap: null, promo: 'q', castle: null };
-    } else {
-      const c = idxs((p) => 'qrb'.includes(p)); if (!c.length) return refuse('NOTHING TO CLOWN ON');
-      let t = c[0]; for (const k of c) if (E.VAL[b[k]] > E.VAL[b[t]]) t = k;
+    } else if (kind === 'clown') {
+      const c = idxs((p) => 'qrb'.includes(p)).sort((x, y) => E.VAL[b[y]] - E.VAL[b[x]]);
+      const t = c.find((q) => { const nb = b.slice(); nb[q] = 'n'; return safe(nb); });
+      if (t === undefined) return refuse('NOTHING TO CLOWN ON');
       b[t] = 'n'; clearCorner(t); m = { f: t, t, piece: 'x', cap: null, promo: null, castle: null };
       popup('CLOWNED 🤡', '#ff8a1a'); speak('Clowned'); burstAtSquare(t, ['🤡', '🎈', '🤣'], 16);
+    } else if (kind === 'rizz') {
+      // A converted piece keeps its square, so it can't open a line onto your king. Prefer one
+      // the bot can't immediately take back (a stolen pawn on rank 7 is usually surrounded).
+      const c = idxs((p) => 'pnb'.includes(p)); if (!c.length) return refuse('NOBODY LEFT TO RIZZ');
+      const keep = c.filter((q) => { const nb = b.slice(); nb[q] = nb[q].toUpperCase(); return !E.isAttacked(nb, q, 'b'); });
+      const t = rand(keep.length ? keep : c); b[t] = b[t].toUpperCase(); m = { f: t, t, piece: 'x', cap: null, promo: null, castle: null };
+      popup('RIZZED 😏 +1 PIECE', '#ff2bd6'); speak('Rizzed'); burstAtSquare(t, ['😏', '💘', '✨'], 16);
+      setTimeout(() => npcSay('bro left me for you 💔'), 300);
+    } else { // nuke
+      // Atomic-chess blast: the target and every non-pawn piece next to it, either colour, are
+      // removed (kings survive). Picks a blast that costs the bot more than you when one exists.
+      const blast = (c) => {
+        const out = [c], r0 = c >> 3, f0 = c & 7;
+        for (let dr = -1; dr <= 1; dr++) for (let df = -1; df <= 1; df++) {
+          const r = r0 + dr, f = f0 + df;
+          if ((dr || df) && r >= 0 && r < 8 && f >= 0 && f < 8) { const q = b[r * 8 + f]; if (q && !'pPkK'.includes(q)) out.push(r * 8 + f); }
+        }
+        return out;
+      };
+      const ok = [];
+      for (const c of idxs((p) => E.colorOf(p) === 'b' && p !== 'k')) {
+        const sqs = blast(c), nb = b.slice(); sqs.forEach((q) => { nb[q] = null; });
+        if (!safe(nb)) continue;
+        ok.push({ c, sqs, net: sqs.reduce((n, q) => n + (E.colorOf(b[q]) === 'b' ? 1 : -1) * E.VAL[b[q].toLowerCase()], 0) });
+      }
+      if (!ok.length) return refuse('NOWHERE SAFE TO NUKE');
+      const good = ok.filter((o) => o.net > 0), pick = good.length ? rand(good) : ok.sort((x, y) => y.net - x.net)[0];
+      const cap = b[pick.c];
+      for (const q of pick.sqs) { if (q !== pick.c) yeet(q, b[q]); burstAtSquare(q, ['💥', '☢️', '🔥'], 8); b[q] = null; clearCorner(q); }
+      m = { f: pick.c, t: pick.c, piece: 'x', cap, promo: null, castle: null };
+      popup('NUKED ☢️💣', '#ffe600'); speak('Nuke'); flash(); sfx.boom(); setTimeout(sfx.boom, 180);
+      addChat('obituary_bot', `☢️ ${pick.sqs.length} piece${pick.sqs.length > 1 ? 's' : ''} vaporized`, '#ffffff');
     }
     m.card = kind; hand.splice(i, 1); sfx.uno(); shake(true);
     commit({ b, turn: 'b', cast, ep: -1, half: 0 }, m, 'you', prevHand);
@@ -920,7 +1115,7 @@
   /* ---------- beat ---------- */
   let beatTimer = null, beatStep = 0, beatNext = 0;
   const BASS = [55, 0, 55, 0, 65.4, 0, 49, 0, 55, 0, 55, 55, 73.4, 0, 65.4, 0];
-  const bpm = () => 104 + rankIdx * 14 + Math.min(combo, 5) * 4;
+  const bpm = () => 104 + rankIdx * 14 + Math.min(combo, 5) * 4 + (ohio ? 24 : 0);
   function schedBeat() {
     const a = A(); if (!a) return;
     while (beatNext < a.currentTime + 0.15) {
@@ -988,8 +1183,8 @@
   }
 
   function chaosMaybe() {
-    if (over || plyCount % 10 !== 0) return;
-    const roll = rand(['spin', 'hue', 'skin', 'hype', 'rain', 'tax', 'blessing']);
+    if (over || plyCount % (ohio ? 4 : 10) !== 0) return;
+    const roll = rand(['spin', 'hue', 'skin', 'hype', 'rain', 'tax', 'blessing', 'dvd', 'gravity']);
     const app = $('app');
     if (roll === 'spin' && !reduceMotion) {
       popup('BOARD SPIN 🌀', '#19f0ff'); const bb = $('boardbox'); bb.classList.add('spin');
@@ -998,7 +1193,7 @@
       popup('VIBE SHIFT 🌈', '#b6ff1a'); app.classList.add('hue'); setTimeout(() => app.classList.remove('hue'), 4000);
     } else if (roll === 'skin') {
       popup('EMOJI ROULETTE 🎰', '#ffe600');
-      skinOverride = rand(['meme', 'animals', 'food'].filter((s) => s !== skin));
+      skinOverride = rand(['italian', 'meme', 'animals', 'food'].filter((s) => s !== skin));
       render(); setTimeout(() => { skinOverride = null; render(); }, 6000);
     } else if (roll === 'rain') {
       popup('EMOJI RAIN 🌧️', '#19f0ff'); rain(40); chatSay('idle', 3);
@@ -1006,6 +1201,10 @@
       const t = Math.min(aura, 30 + Math.round(aura * 0.1)); setAura(aura - t); const tx = rand(TEXT.tax); popup(tx, '#ff8a1a'); speak(tx); addChat('fanum', 'i am taxing ' + t + ' aura', '#ff8a1a'); burst(innerWidth / 2, innerHeight / 3, ['🍟'], 14);
     } else if (roll === 'blessing') {
       setAura(aura + 150); popup('AURA BLESSING +150 ✨', '#b6ff1a'); speak('Aura blessing'); burst(innerWidth / 2, innerHeight / 3, ['✨', '🙏', '😇'], 18);
+    } else if (roll === 'dvd') {
+      popup('DVD LOGO EVENT 📀', '#19f0ff'); dvd();
+    } else if (roll === 'gravity') {
+      popup('GRAVITY GLITCH 🍎', '#b6ff1a'); gravity();
     } else {
       popup('CHAT GOING WILD 📈', '#ff2bd6'); chatSay('idle', 4); addLikes(150);
     }
@@ -1027,7 +1226,8 @@
     } else {
       title = 'DRAW?? 😐';
       sub = ({ stalemate: 'STALEMATE. NOBODY ATE. BORING.', repetition: 'SAME POSITION 3 TIMES. THE LOOP IS REAL.',
-        fifty: '50 MOVES WITH NO CAPTURE OR PAWN MOVE. TOUCH GRASS.' })[st] || 'NOT ENOUGH PIECES. THE LORE ENDS HERE.';
+        fifty: '50 MOVES WITH NO CAPTURE OR PAWN MOVE. TOUCH GRASS.',
+        agreed: 'YOU TOOK THE DRAW WHILE WINNING. THE BOT SAYS THANK YOU. CRINGE.' })[st] || 'NOT ENOUGH PIECES. THE LORE ENDS HERE.';
       sfx.sad(); chatSay('lose', 2);
     }
     setStatus(title);
@@ -1051,7 +1251,7 @@
       if (left <= 0) {
         clearInterval(timerId);
         if (over || thinking || S.turn !== PLAYER) return;
-        closePromo(); cancelDrag();
+        closePromo(); cancelDrag(); closeOffer();
         const ms = legal.filter((m) => !m.promo || m.promo === 'q');
         popup(rand(TEXT.slow), '#ff3b3b'); chatSay('lost', 2); setAura(aura - 15);
         if (ms.length) play(rand(ms), 'timeout');
@@ -1082,13 +1282,24 @@
   $('lvlbtn').addEventListener('click', () => { A(); level = (level + 1) % 3; $('lvltxt').textContent = LEVELS[level]; setStatus('OPPONENT: ' + LEVELS[level]); tone(500 + level * 200, .1, 'square', .05); });
   $('skinbtn').addEventListener('click', () => {
     A(); skin = SKIN_ORDER[(SKIN_ORDER.indexOf(skin) + 1) % SKIN_ORDER.length]; skinOverride = null;
-    try { localStorage.setItem('brainrot-chess-skin', skin); } catch (e) {}
+    try { localStorage.setItem('brainrot-chess-skin-v2', skin); } catch (e) {}
     render(); setStatus('SKIN: ' + SKINS[skin].name); tone(700, .08, 'triangle', .07);
   });
   $('mutebtn').addEventListener('click', (e) => { muted = !muted; e.currentTarget.textContent = muted ? '🔇 SFX' : '🔊 SFX'; e.currentTarget.classList.toggle('on', !muted); if (!muted) { A(); tone(800, .1, 'triangle', .08); } else { try { window.speechSynthesis && speechSynthesis.cancel(); } catch (x) {} } });
   $('voicebtn').addEventListener('click', (e) => { A(); voiceOn = !voiceOn; e.currentTarget.classList.toggle('on', voiceOn); if (voiceOn) speak('Voice on, no cap'); else { try { speechSynthesis.cancel(); } catch (x) {} } });
   $('beatbtn').addEventListener('click', () => { A(); setBeat(!beatOn); setStatus(beatOn ? 'BEAT ON: TEMPO SCALES WITH YOUR AURA 🎵' : 'BEAT OFF'); });
   $('newbtn').addEventListener('click', () => { A(); newGame(); });
+  $('ohiobtn').addEventListener('click', (e) => {
+    A(); ohio = !ohio; e.currentTarget.classList.toggle('on', ohio); $('app').classList.toggle('ohio', ohio);
+    if (ohio) { popup('OHIO MODE 🌽', '#ffe600'); speak('Ohio mode activated'); rain(30); setStatus('OHIO MODE: CHAOS AND CARDS EVERY 4 PLIES 🌽'); }
+    else setStatus('OHIO MODE OFF. YOU ESCAPED OHIO.');
+  });
+  $('offeryes').addEventListener('click', () => {
+    closeOffer(); showEval({ st: 'agreed', cp: 0, mate: 0 }); npcSay('W. thank you. you are so kind 🥹'); finish('agreed', PLAYER);
+  });
+  $('offerno').addEventListener('click', () => {
+    closeOffer(); setAura(aura + 100); popup('DECLINED. BASED 🗿', '#b6ff1a'); npcSay(rand(NPC.rage)); chatSay('capture', 2); render();
+  });
   $('again').addEventListener('click', () => { A(); newGame(); });
 
   /* ---------- ambient brainrot ---------- */
